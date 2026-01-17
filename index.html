@@ -98,6 +98,29 @@
         </div>
     </div>
 
+    <!-- GLOBAL RESET MODAL -->
+    <div id="global-reset-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-content" style="text-align: center; width: 360px;">
+            <h3>Master Reset</h3>
+            <p style="margin-bottom:20px; color:#aaa; font-size:13px;">Manage the entire database state.</p>
+            
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <button id="btn-global-bake" class="primary-btn" style="background:#059669;">Bake Consensus (Keep Items)</button>
+                <div style="font-size:10px; color:#666;">Sets current averages as new defaults. Clears votes. Keeps user tools.</div>
+
+                <button id="btn-global-clear-votes" class="primary-btn" style="background:#d97706; margin-top:10px;">Clear All Votes (Keep Items)</button>
+                <div style="font-size:10px; color:#666;">Resets dots to their last baked positions. Keeps user tools.</div>
+                
+                <button id="btn-global-nuke" class="primary-btn" style="background:#b91c1c; margin-top:10px;">Factory Reset (Nuke)</button>
+                <div style="font-size:10px; color:#666;">DELETES EVERYTHING. Restores original 19 tools.</div>
+            </div>
+
+            <div style="margin-top:20px;">
+                <button id="global-cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ADMIN CONTROLS -->
     <button id="global-reset-btn">MASTER RESET</button>
 

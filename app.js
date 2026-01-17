@@ -93,25 +93,6 @@ if (window.location.search.includes('admin=true')) {
     });
 }
 
-document.getElementById('global-reset-btn').onclick = () => {
-    if (confirm("DANGER: This will delete ALL custom tools and ALL votes. It restores the original items.")) {
-        if(confirm("FINAL WARNING: This cannot be undone. Are you sure you want to WIPE THE DATABASE?")) {
-             resetWorld();
-        }
-    }
-};
-
-function resetWorld() {
-    set(ref(db), {}).then(() => {
-        const updates = {};
-        initialItems.forEach(item => { updates['items/' + item.id] = item; });
-        update(ref(db), updates);
-        alert("World Reset Complete.");
-        window.location.reload();
-    });
-}
-
-
 function initApp() {
     const container = document.getElementById('graph-container');
     
@@ -169,6 +150,7 @@ function initApp() {
     setupModalLogic();
     setupEditModalLogic();
     setupResetModalLogic();
+    setupGlobalResetLogic();
 
     const itemsRef = ref(db, 'items');
     onValue(itemsRef, (snapshot) => {
@@ -284,6 +266,69 @@ function setupResetModalLogic() {
         const id = document.getElementById('reset-item-id').value;
         if(id) {
             remove(ref(db, 'votes/' + id));
+            modal.style.display = 'none';
+        }
+    };
+}
+
+function setupGlobalResetLogic() {
+    const modal = document.getElementById('global-reset-modal');
+    const btnOpen = document.getElementById('global-reset-btn');
+    const btnBake = document.getElementById('btn-global-bake');
+    const btnClearVotes = document.getElementById('btn-global-clear-votes');
+    const btnNuke = document.getElementById('btn-global-nuke');
+    const btnCancel = document.getElementById('global-cancel-btn');
+
+    if(btnOpen) btnOpen.onclick = () => modal.style.display = 'flex';
+    if(btnCancel) btnCancel.onclick = () => modal.style.display = 'none';
+
+    // 1. FACTORY RESET (Nuke)
+    btnNuke.onclick = () => {
+        if(confirm("FINAL WARNING: This will delete ALL user created tools and revert to the original 19 items.")) {
+            set(ref(db), {}).then(() => {
+                const updates = {};
+                initialItems.forEach(item => { updates['items/' + item.id] = item; });
+                update(ref(db), updates);
+                modal.style.display = 'none';
+                window.location.reload();
+            });
+        }
+    };
+
+    // 2. CLEAR VOTES (Keep Items)
+    btnClearVotes.onclick = () => {
+        if(confirm("Clear all votes? Items will snap back to their default positions.")) {
+            remove(ref(db, 'votes'));
+            modal.style.display = 'none';
+        }
+    };
+
+    // 3. BAKE CONSENSUS
+    btnBake.onclick = () => {
+        if(confirm("Update all item defaults to their current positions and clear votes?")) {
+            const updates = {};
+            
+            // Loop through all rendered items to capture their current DOM position (Consensus)
+            renderedItems.forEach(id => {
+                const dot = document.getElementById(`dot-${id}`);
+                if(dot) {
+                    const currentX = parseFloat(dot.style.left);
+                    const currentY = parseFloat(dot.style.bottom);
+                    
+                    // We only update X/Y, we keep name/desc intact
+                    updates[`items/${id}/x`] = currentX;
+                    updates[`items/${id}/y`] = currentY;
+                }
+            });
+            
+            // Clear votes in the same atomic update? 
+            // No, 'votes' is a sibling of 'items'. We can do root-level update.
+            // But we need to construct the update object carefully.
+            // firebase update() merges. So we can't just set 'votes': null to delete it via update?
+            // Actually yes, setting a path to null deletes it.
+            updates['votes'] = null;
+
+            update(ref(db), updates);
             modal.style.display = 'none';
         }
     };

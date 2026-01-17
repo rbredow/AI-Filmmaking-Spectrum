@@ -23,6 +23,7 @@ p { color: #666; font-size: 0.9rem; margin-bottom: 0; }
     border-bottom: 1px solid #333;
     background: linear-gradient(to bottom, #111 0%, #050505 100%);
     margin-bottom: 80px; 
+    transition: background 3s;
 }
 
 /* Y-Axis Indicator */
@@ -32,10 +33,11 @@ p { color: #666; font-size: 0.9rem; margin-bottom: 0; }
     background: linear-gradient(to top, #ff3d00 0%, #ffea00 50%, #00e676 100%);
     border-radius: 2px;
     opacity: 0.8;
+    transition: opacity 3s;
 }
 
 /* Axis Labels */
-.axis-label { position: absolute; color: #444; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+.axis-label { position: absolute; color: #444; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; transition: opacity 3s; }
 .x-label-left { bottom: -40px; left: 0; }
 .x-label-right { bottom: -40px; right: 0; }
 .y-label-top { top: -25px; left: -10px; color: #00e676; }
@@ -56,7 +58,49 @@ p { color: #666; font-size: 0.9rem; margin-bottom: 0; }
 }
 #add-item-btn:hover { color: #fff; transform: scale(1.1); }
 
-.grid-line { position: absolute; background: #222; pointer-events: none; }
+/* View Mode Button */
+#view-mode-btn {
+    position: absolute;
+    top: -30px; 
+    right: 40px; 
+    color: #444; 
+    font-size: 14px; 
+    font-weight: 700;
+    cursor: pointer;
+    line-height: 24px;
+    user-select: none;
+    transition: color 0.2s;
+    border: 1px solid #333;
+    padding: 0 8px;
+    border-radius: 4px;
+}
+#view-mode-btn:hover { color: #fff; border-color: #666; }
+
+/* Subtle Master Reset Button */
+#global-reset-btn {
+    display: none; 
+    position: fixed; 
+    bottom: 10px; 
+    left: 10px; 
+    background: #222; 
+    color: #666; 
+    border: 1px solid #333; 
+    padding: 6px 10px; 
+    border-radius: 4px; 
+    cursor: pointer; 
+    z-index: 1000;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    transition: all 0.2s;
+}
+#global-reset-btn:hover { 
+    background: #333; 
+    color: #ccc; 
+    border-color: #555;
+}
+
+.grid-line { position: absolute; background: #222; pointer-events: none; transition: opacity 3s; }
 .grid-x { width: 100%; height: 1px; }
 .grid-y { height: 100%; width: 1px; }
 
@@ -74,6 +118,7 @@ p { color: #666; font-size: 0.9rem; margin-bottom: 0; }
     stroke-dasharray: 1 1; 
     opacity: 0.6;
     vector-effect: non-scaling-stroke;
+    transition: opacity 0.5s; 
 }
 
 /* --- SPLASH ANIMATION --- */
@@ -127,10 +172,18 @@ p { color: #666; font-size: 0.9rem; margin-bottom: 0; }
     box-shadow: 0 4px 10px rgba(0,0,0,0.8);
     z-index: 10;
     border: 2px solid #fff;
-    transition: transform 0.2s, top 0.2s, left 0.2s; 
+    transition: bottom 3s ease-in-out, transform 0.2s, left 0.2s, background-color 3s, box-shadow 3s; 
+    
+    /* Ensure background is white by default to catch events, but overwritten by color classes */
+    background-color: #fff; 
 }
 .dot:active { cursor: grabbing; }
 .dot:hover { z-index: 100; transform: translate(-50%, 50%) scale(1.2); border-color: #fff; }
+
+/* --- COLOR CLASSES (High Specificity) --- */
+.dot.ready-high { background-color: #00e676; box-shadow: 0 0 10px rgba(0, 230, 118, 0.4); }
+.dot.ready-mid { background-color: #ffea00; box-shadow: 0 0 10px rgba(255, 234, 0, 0.4); }
+.dot.ready-low { background-color: #ff3d00; box-shadow: 0 0 10px rgba(255, 61, 0, 0.4); }
 
 /* --- USER VOTE DOT (Personal) --- */
 .user-dot {
@@ -145,6 +198,7 @@ p { color: #666; font-size: 0.9rem; margin-bottom: 0; }
     box-shadow: 0 0 0 1px rgba(0,0,0,0.5), inset 0 0 4px rgba(59, 130, 246, 0.5);
     z-index: 20; 
     display: none; 
+    transition: bottom 3s ease-in-out;
 }
 .user-dot::after {
     content: '';
@@ -169,25 +223,27 @@ p { color: #666; font-size: 0.9rem; margin-bottom: 0; }
     letter-spacing: 0.5px;
     text-shadow: 0 2px 4px rgba(0,0,0,1);
     z-index: -1; 
+    transition: all 3s ease-in-out; 
+    
+    /* UNIFIED ANCHOR */
+    left: 50%;
+    top: 50%;
+    transform-origin: left center;
 }
 
+/* 2D: READY (Top items) -> BELOW the dot */
+/* Rotate 45deg Down-Right */
 .label-below {
-    top: 50%;
-    right: 50%; 
-    transform-origin: right center; 
-    transform: rotate(-60deg) translateX(-22px); 
+    transform: rotate(45deg) translate(15px, 0); 
 }
 
+/* 2D: NOT READY (Bottom items) -> ABOVE the dot */
+/* Move UP and Right, keep 45deg angle */
+/* We translate first (relative to unrotated), then rotate? No, transform order matters. */
+/* translate(X,Y) rotate(45). X=Right, Y=Up. */
 .label-above {
-    top: 50%;
-    left: 50%; 
-    transform-origin: left center; 
-    transform: rotate(-60deg) translateX(22px); 
+    transform: translate(10px, -25px) rotate(45deg); 
 }
-
-.ready-high { background-color: #00e676; box-shadow: 0 0 10px rgba(0, 230, 118, 0.4); }
-.ready-mid { background-color: #ffea00; box-shadow: 0 0 10px rgba(255, 234, 0, 0.4); }
-.ready-low { background-color: #ff3d00; box-shadow: 0 0 10px rgba(255, 61, 0, 0.4); }
 
 /* Tooltip */
 .tooltip {
@@ -199,7 +255,6 @@ p { color: #666; font-size: 0.9rem; margin-bottom: 0; }
     padding: 12px 16px;
     border-radius: 6px;
     width: 260px;
-    /* TOUCHING THE DOT: we remove translateY and position bottom just at the edge */
     bottom: 12px; 
     left: 50%;
     transform: translateX(-50%);
@@ -212,8 +267,6 @@ p { color: #666; font-size: 0.9rem; margin-bottom: 0; }
     z-index: 200;
     text-align: left;
 }
-
-/* Invisible Bridge to keep tooltip open while moving mouse */
 .tooltip::after {
     content: '';
     position: absolute;
@@ -223,7 +276,6 @@ p { color: #666; font-size: 0.9rem; margin-bottom: 0; }
     height: 20px;
     background: transparent;
 }
-
 .tooltip strong { display: block; color: #fff; margin-bottom: 4px; font-size: 14px; }
 .tooltip span { display: block; font-size: 11px; color: #888; margin-top: 6px; font-style: italic; border-top: 1px solid #333; padding-top: 6px;}
 .dot:hover .tooltip { visibility: visible; opacity: 1; }
@@ -282,6 +334,35 @@ button { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; b
 button:hover { background: #444; }
 .primary-btn { background: #3b82f6; color: #fff; }
 .primary-btn:hover { background: #2563eb; }
+
+/* ========================================= */
+/*               1D MODE STYLES              */
+/* ========================================= */
+
+.mode-1d .y-axis-gradient { opacity: 0; }
+.mode-1d .axis-label.y-label-top, 
+.mode-1d .axis-label.y-label-bottom { opacity: 0; }
+.mode-1d .grid-y { opacity: 0; }
+
+.mode-1d .dot, 
+.mode-1d .user-dot {
+    bottom: 50% !important;
+    background-color: #888 !important; 
+    box-shadow: 0 2px 8px rgba(0,0,0,0.8) !important;
+}
+.mode-1d .user-dot {
+    background-color: transparent !important;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.5), inset 0 0 4px rgba(59, 130, 246, 0.5) !important;
+}
+
+.mode-1d .connection-line {
+    opacity: 0;
+}
+
+/* 1D MODE: FORCE ALL LABELS TO POINT DOWN-RIGHT */
+.mode-1d .dot-label {
+    transform: rotate(45deg) translate(15px, 0) !important;
+}
 
 @media (max-width: 600px) {
     #graph-container { height: 500px; width: 95%; } 

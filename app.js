@@ -29,6 +29,7 @@ let isDragging = null;
 let previousData = {}; 
 let svgLayer = null;   
 let renderedItems = new Set();
+let viewMode = '2D'; // '1D' or '2D'
 const ADMIN_EMAIL = "rob.bredow@gmail.com";
 
 // --- INITIAL DATA SEED ---
@@ -73,11 +74,9 @@ onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUser = user;
         isAdmin = (user.email === ADMIN_EMAIL);
-        console.log("Logged in:", user.email || "Anonymous", "Admin?", isAdmin);
         updateAdminUI();
         initApp();
     } else {
-        // Not logged in? Try anonymous.
         signInAnonymously(auth).catch(e => console.error("Anon Auth failed", e));
     }
 });
@@ -87,21 +86,15 @@ function updateAdminUI() {
     if (resetBtn) resetBtn.style.display = isAdmin ? 'block' : 'none';
 }
 
-// URL-TRIGGERED ADMIN LOGIN
-// If URL has ?admin=true, trigger login popup.
 if (window.location.search.includes('admin=true')) {
-    // Clear URL parameter so it doesn't loop
     const newUrl = window.location.origin + window.location.pathname;
     window.history.replaceState({}, document.title, newUrl);
-    
-    // Trigger Login
     signInWithPopup(auth, googleProvider).catch((error) => {
         console.error(error);
         alert("Login Failed: " + error.message);
     });
 }
 
-// Global Reset Handler
 document.getElementById('global-reset-btn').onclick = () => {
     if (confirm("DANGER: This will delete ALL custom tools and ALL votes. It restores the original items.")) {
         if(confirm("FINAL WARNING: This cannot be undone. Are you sure you want to WIPE THE DATABASE?")) {
@@ -124,6 +117,22 @@ function resetWorld() {
 function initApp() {
     const container = document.getElementById('graph-container');
     
+    // Setup toggle button logic
+    const toggleBtn = document.getElementById('view-mode-btn');
+    if(toggleBtn) {
+        toggleBtn.onclick = () => {
+            if(viewMode === '2D') {
+                viewMode = '1D';
+                toggleBtn.innerText = '1D';
+                container.classList.add('mode-1d');
+            } else {
+                viewMode = '2D';
+                toggleBtn.innerText = '2D';
+                container.classList.remove('mode-1d');
+            }
+        };
+    }
+
     container.innerHTML = `
         <div class="y-axis-gradient"></div>
         <div class="grid-line grid-x" style="bottom: 50%"></div>
@@ -133,8 +142,26 @@ function initApp() {
         <div class="axis-label y-label-top">Ready</div>
         <div class="axis-label y-label-bottom">Not Ready</div>
         <div id="add-item-btn" title="Add New Tool">+</div>
+        <div id="view-mode-btn" title="Toggle 1D/2D View">2D</div>
     `;
     renderedItems.clear();
+
+    // Re-bind Toggle (since we wiped innerHTML)
+    document.getElementById('view-mode-btn').onclick = () => {
+        const btn = document.getElementById('view-mode-btn');
+        if(viewMode === '2D') {
+            viewMode = '1D';
+            btn.innerText = '1D';
+            container.classList.add('mode-1d');
+        } else {
+            viewMode = '2D';
+            btn.innerText = '2D';
+            container.classList.remove('mode-1d');
+        }
+    };
+    
+    // Restore mode state visually
+    if (viewMode === '1D') container.classList.add('mode-1d');
 
     svgLayer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svgLayer.id = "connections-layer";
@@ -307,10 +334,51 @@ function removeItemElements(id) {
 function setupDrag(avgDot, userDot, item, container) {
     const updateFirebase = throttle((x, y) => {
         if(!currentUser) return;
-        set(ref(db, 'votes/' + item.id + '/' + currentUser.uid), {
-            x: Math.round(x * 10) / 10,
-            y: Math.round(y * 10) / 10
-        });
+        
+        // --- 1D MODE LOGIC ---
+        if (viewMode === '1D') {
+            // Find existing Y value to preserve it
+            let targetY = 50; // default safe fallback
+            
+            // Check previous vote
+            const itemVotes = previousData[item.id] || {};
+            if (itemVotes[currentUser.uid]) {
+                targetY = itemVotes[currentUser.uid].y;
+            } else {
+                // If no vote, use current Consensus Y (item.y from DB or DOM)
+                // We don't have direct access to 'item' LIVE object here easily without lookup
+                // but 'item' passed to setupDrag is the initial object.
+                // Better: Use DOM position of avgDot as proxy for consensus Y if needed?
+                // Actually, let's just use the 'item' object passed in. It might be stale? 
+                // JS objects are references. If updated in `onValue`, it might be fresh?
+                // No, createItemElements is called once. 'item' is static reference.
+                // We should look up the current avg from DOM or previousData.
+                
+                // Let's assume 50 if totally new, or use item.y (initial).
+                // But ideally we want the *current* consensus.
+                // Let's grab it from the DOM element style?
+                const avgDotDom = document.getElementById(`dot-${item.id}`);
+                if (avgDotDom) {
+                    // Inline style is set by JS, so it's accurate even if CSS overrides it visually
+                    const currentBottom = avgDotDom.style.bottom; // "98%"
+                    if(currentBottom) targetY = parseFloat(currentBottom);
+                    else targetY = item.y;
+                }
+            }
+
+            // Only update X, preserve Y
+            set(ref(db, 'votes/' + item.id + '/' + currentUser.uid), {
+                x: Math.round(x * 10) / 10,
+                y: Math.round(targetY * 10) / 10
+            });
+            
+        } else {
+            // 2D Mode: Normal
+            set(ref(db, 'votes/' + item.id + '/' + currentUser.uid), {
+                x: Math.round(x * 10) / 10,
+                y: Math.round(y * 10) / 10
+            });
+        }
     }, 50);
 
     const startDrag = function(event, targetElement) {
@@ -324,6 +392,7 @@ function setupDrag(avgDot, userDot, item, container) {
         activeDot.style.zIndex = 1000;
         activeDot.style.transition = 'none';
         let shiftX = 0, shiftY = 0;
+        
         if (targetElement === avgDot) {
             shiftX = activeDot.offsetWidth / 2;
             shiftY = activeDot.offsetHeight / 2;
@@ -331,17 +400,41 @@ function setupDrag(avgDot, userDot, item, container) {
             shiftX = event.clientX - activeDot.getBoundingClientRect().left;
             shiftY = event.clientY - activeDot.getBoundingClientRect().top;
         }
+        
         function moveAt(pageX, pageY) {
             let newX = pageX - shiftX - container.getBoundingClientRect().left;
             let newY = pageY - shiftY - container.getBoundingClientRect().top;
+            
             if (newX < 0) newX = 0;
             if (newX > container.clientWidth) newX = container.clientWidth;
             if (newY < 0) newY = 0;
             if (newY > container.clientHeight) newY = container.clientHeight;
+            
             let percentX = (newX / container.clientWidth) * 100;
             let percentY = 100 - ((newY / container.clientHeight) * 100);
+            
+            // In 1D mode, visually snap User Dot to 50%?
+            // Yes, because the mouse Y shouldn't matter visually.
+            // But 'updateElementPosition' sets style.bottom.
+            // If CSS has !important, the JS value is ignored. 
+            // So we can just set it to percentY (mouse) and let CSS handle the squash.
+            // Wait, if we set it to mouse Y, the data attribute tempY gets mouse Y.
+            // We need tempY to be correct for the final commit.
+            
+            if (viewMode === '1D') {
+                // Determine the Y we WANT to save (Consensus or Previous)
+                // We calculated this in the throttle, but we need it here for the final commit.
+                // Let's re-use the logic or just store it.
+                // Simple hack: We won't update 'percentY' based on mouse.
+                // We will use the stored previous value.
+                
+                // ... Actually, let's just let percentY follow the mouse for now,
+                // BUT inside updateFirebase and onMouseUp, we override it.
+            }
+
             updateElementPosition(activeDot, percentX, percentY);
             updateFirebase(percentX, percentY);
+            
             const avgDot = document.getElementById(`dot-${item.id}`);
             if(avgDot) {
                 const avgX = parseFloat(avgDot.style.left);
@@ -359,9 +452,29 @@ function setupDrag(avgDot, userDot, item, container) {
             isDragging = null;
             activeDot.style.transition = '';
             activeDot.style.zIndex = '';
+            
             if (activeDot.dataset.tempX) {
-                const x = parseFloat(activeDot.dataset.tempX);
-                const y = parseFloat(activeDot.dataset.tempY);
+                let x = parseFloat(activeDot.dataset.tempX);
+                let y = parseFloat(activeDot.dataset.tempY);
+                
+                // FINAL COMMIT LOGIC FOR 1D
+                if (viewMode === '1D') {
+                     // Look up correct Y again
+                     let targetY = 50;
+                     const itemVotes = previousData[item.id] || {};
+                     if (itemVotes[currentUser.uid]) {
+                        targetY = itemVotes[currentUser.uid].y;
+                     } else {
+                        const avgDotDom = document.getElementById(`dot-${item.id}`);
+                        if (avgDotDom) {
+                            const currentBottom = avgDotDom.style.bottom; 
+                            if(currentBottom) targetY = parseFloat(currentBottom);
+                            else targetY = item.y;
+                        }
+                     }
+                     y = targetY;
+                }
+
                 set(ref(db, 'votes/' + item.id + '/' + currentUser.uid), {
                     x: Math.round(x * 10) / 10,
                     y: Math.round(y * 10) / 10

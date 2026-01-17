@@ -176,7 +176,7 @@ p { color: #666; font-size: 0.9rem; margin-bottom: 0; }
     background-color: #fff; 
 }
 .dot:active { cursor: grabbing; }
-.dot:hover { z-index: 100; transform: translate(-50%, 50%) scale(1.2); border-color: #fff; }
+.dot:hover, .dot.force-tooltip { z-index: 100; transform: translate(-50%, 50%) scale(1.2); border-color: #fff; }
 
 .dot.ready-high { background-color: #00e676; box-shadow: 0 0 10px rgba(0, 230, 118, 0.4); }
 .dot.ready-mid { background-color: #ffea00; box-shadow: 0 0 10px rgba(255, 234, 0, 0.4); }

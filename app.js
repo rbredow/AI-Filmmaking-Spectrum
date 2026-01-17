@@ -168,6 +168,7 @@ function initApp() {
 
     setupModalLogic();
     setupEditModalLogic();
+    setupResetModalLogic();
 
     const itemsRef = ref(db, 'items');
     onValue(itemsRef, (snapshot) => {
@@ -255,6 +256,39 @@ function setupEditModalLogic() {
     };
 }
 
+function setupResetModalLogic() {
+    const modal = document.getElementById('reset-options-modal');
+    const btnBake = document.getElementById('btn-bake');
+    const btnClear = document.getElementById('btn-clear');
+    const btnCancel = document.getElementById('reset-cancel-btn');
+
+    if(btnCancel) btnCancel.onclick = () => modal.style.display = 'none';
+
+    btnBake.onclick = () => {
+        const id = document.getElementById('reset-item-id').value;
+        const dot = document.getElementById(`dot-${id}`);
+        if(id && dot) {
+            // Read current visual position (Consensus)
+            const currentX = parseFloat(dot.style.left);
+            const currentY = parseFloat(dot.style.bottom);
+            
+            // Update Item Baseline & Clear Votes
+            update(ref(db, 'items/' + id), { x: currentX, y: currentY });
+            remove(ref(db, 'votes/' + id));
+            
+            modal.style.display = 'none';
+        }
+    };
+
+    btnClear.onclick = () => {
+        const id = document.getElementById('reset-item-id').value;
+        if(id) {
+            remove(ref(db, 'votes/' + id));
+            modal.style.display = 'none';
+        }
+    };
+}
+
 
 function createItemElements(container, item) {
     const avgDot = document.createElement('div');
@@ -301,12 +335,36 @@ function createItemElements(container, item) {
 
     if(item.x > 80) { tooltip.style.left = 'auto'; tooltip.style.right = '0'; tooltip.style.transform = 'translateX(20px)'; }
     if(item.x < 15) { tooltip.style.left = '0'; tooltip.style.transform = 'translateX(-20px)'; }
+    
     avgDot.appendChild(tooltip);
     container.appendChild(avgDot);
 
     const userDot = document.createElement('div');
     userDot.className = 'user-dot';
     userDot.id = `user-dot-${item.id}`;
+    
+    // Proxy Hover Events for Tooltip (Class-based)
+    userDot.onmouseenter = () => {
+        const avgDot = document.getElementById(`dot-${item.id}`);
+        if(avgDot) avgDot.classList.add('force-tooltip');
+    };
+    userDot.onmouseleave = (e) => {
+        const avgDot = document.getElementById(`dot-${item.id}`);
+        // Only remove if not moving to the avgDot itself
+        if(avgDot && e.relatedTarget !== avgDot && !avgDot.contains(e.relatedTarget)) {
+             avgDot.classList.remove('force-tooltip');
+        }
+    };
+    
+    // Also handle leaving avgDot to not hide if entering userDot
+    avgDot.onmouseleave = (e) => {
+        if(e.relatedTarget === userDot) {
+            avgDot.classList.add('force-tooltip');
+        } else {
+            avgDot.classList.remove('force-tooltip');
+        }
+    };
+
     container.appendChild(userDot);
 
     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
@@ -370,14 +428,35 @@ function setupDrag(avgDot, userDot, item, container) {
 
     const startDrag = function(event, targetElement) {
         if(!currentUser) return;
-        if (event.target.classList.contains('admin-btn')) return;
+        
+        // Block drag if clicking buttons (Admin) or inputs
+        if (event.target.closest('button') || event.target.closest('input') || event.target.closest('.admin-btn')) return;
+        
+        // Optional: Block drag if selecting text? 
+        // Hard to detect 'intent', but usually text selection happens on mousedown+move.
+        // We can't block mousedown based on future selection.
+        // However, if the user clicks *text* inside the tooltip, they might want to select.
+        // The previous CSS fix (lifting the tooltip) allows them to click the DOT for dragging.
+        // So we can say: If clicking INSIDE tooltip visible area, DON'T drag.
+        // But we want to allow dragging if they miss the text and hit the 'bridge'.
+        // Detecting 'bridge' vs 'box' is hard.
+        // Let's stick to the visual separation we just added in CSS.
+        // If the user clicks the tooltip box, let's PREVENT drag so they can select text.
+        
+        if (event.target.closest('.tooltip')) {
+             return; 
+        }
+
         event.preventDefault();
         event.stopPropagation();
         isDragging = item.id;
         const activeDot = userDot; 
         activeDot.style.display = 'block';
         activeDot.style.zIndex = 1000;
-        activeDot.style.transition = 'none';
+        
+        // CSS Class override for instant response
+        activeDot.classList.add('dragging');
+
         let shiftX = 0, shiftY = 0;
         
         if (targetElement === avgDot) {
@@ -412,12 +491,14 @@ function setupDrag(avgDot, userDot, item, container) {
         }
         function onMouseMove(event) { moveAt(event.clientX, event.clientY); }
         document.addEventListener('mousemove', onMouseMove);
-        document.onmouseup = function() {
-            document.removeEventListener('mousemove', onMouseMove);
-            document.onmouseup = null;
-            isDragging = null;
-            activeDot.style.transition = '';
-            activeDot.style.zIndex = '';
+                document.onmouseup = function() {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.onmouseup = null;
+                    
+                    isDragging = null;
+                    activeDot.classList.remove('dragging');
+                    activeDot.style.transition = '';
+                    activeDot.style.zIndex = '';
             
             if (activeDot.dataset.tempX) {
                 let x = parseFloat(activeDot.dataset.tempX);
@@ -469,9 +550,18 @@ function updateGraphFromData(allVotes, container) {
             totalX += vote.x; totalY += vote.y; count++;
         });
         if (count > 0) {
-            let avgX = totalX / count, avgY = totalY / count;
+            let avgX = totalX / count;
+            let avgY = totalY / count;
+
             const avgDot = document.getElementById(`dot-${itemId}`);
             if (avgDot) {
+                // If I am dragging THIS item, kill the transition on the Consensus Dot so it follows instantly
+                if (isDragging === itemId) {
+                    avgDot.style.transition = 'none';
+                } else {
+                    avgDot.style.transition = ''; // Revert to CSS default (3s)
+                }
+
                 updateElementPosition(avgDot, avgX, avgY);
                 updateDotColor(avgDot, avgY);
                 const label = document.getElementById(`label-${itemId}`);
@@ -550,7 +640,13 @@ function updateLabelPosition(labelElement, y) {
 }
 
 window.deleteItem = (id) => { if(confirm("Are you sure you want to delete this item?")) { remove(ref(db, 'items/' + id)); remove(ref(db, 'votes/' + id)); } };
-window.resetVotes = (id) => { if(confirm("Reset all votes for this item?")) { remove(ref(db, 'votes/' + id)); } };
+
+window.resetVotes = (id) => { 
+    const modal = document.getElementById('reset-options-modal');
+    document.getElementById('reset-item-id').value = id;
+    modal.style.display = 'flex';
+};
+
 window.editItem = (id) => {
     const modal = document.getElementById('edit-item-modal');
     const name = document.getElementById(`label-${id}`).innerText;

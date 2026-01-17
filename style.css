@@ -173,14 +173,11 @@ p { color: #666; font-size: 0.9rem; margin-bottom: 0; }
     z-index: 10;
     border: 2px solid #fff;
     transition: bottom 3s ease-in-out, transform 0.2s, left 0.2s, background-color 3s, box-shadow 3s; 
-    
-    /* Ensure background is white by default to catch events, but overwritten by color classes */
     background-color: #fff; 
 }
 .dot:active { cursor: grabbing; }
 .dot:hover { z-index: 100; transform: translate(-50%, 50%) scale(1.2); border-color: #fff; }
 
-/* --- COLOR CLASSES (High Specificity) --- */
 .dot.ready-high { background-color: #00e676; box-shadow: 0 0 10px rgba(0, 230, 118, 0.4); }
 .dot.ready-mid { background-color: #ffea00; box-shadow: 0 0 10px rgba(255, 234, 0, 0.4); }
 .dot.ready-low { background-color: #ff3d00; box-shadow: 0 0 10px rgba(255, 61, 0, 0.4); }
@@ -212,6 +209,11 @@ p { color: #666; font-size: 0.9rem; margin-bottom: 0; }
 .user-dot:hover { transform: translate(-50%, 50%) scale(1.2); background: rgba(59, 130, 246, 0.1); }
 .user-dot:active { cursor: grabbing; }
 
+/* DRAGGING OVERRIDE: Must be very specific to beat the 3s transition */
+.dot.dragging, .user-dot.dragging {
+    transition: none !important;
+}
+
 /* --- LABELS --- */
 .dot-label {
     position: absolute;
@@ -224,23 +226,15 @@ p { color: #666; font-size: 0.9rem; margin-bottom: 0; }
     text-shadow: 0 2px 4px rgba(0,0,0,1);
     z-index: -1; 
     transition: all 3s ease-in-out; 
-    
-    /* UNIFIED ANCHOR */
     left: 50%;
     top: 50%;
     transform-origin: left center;
 }
 
-/* 2D: READY (Top items) -> BELOW the dot */
-/* Rotate 45deg Down-Right */
 .label-below {
     transform: rotate(45deg) translate(15px, 0); 
 }
 
-/* 2D: NOT READY (Bottom items) -> ABOVE the dot */
-/* Move UP and Right, keep 45deg angle */
-/* We translate first (relative to unrotated), then rotate? No, transform order matters. */
-/* translate(X,Y) rotate(45). X=Right, Y=Up. */
 .label-above {
     transform: translate(10px, -25px) rotate(45deg); 
 }
@@ -255,13 +249,13 @@ p { color: #666; font-size: 0.9rem; margin-bottom: 0; }
     padding: 12px 16px;
     border-radius: 6px;
     width: 260px;
-    bottom: 12px; 
+    bottom: 24px; 
     left: 50%;
     transform: translateX(-50%);
     color: #ddd;
     font-size: 13px;
     line-height: 1.5;
-    pointer-events: none;
+    pointer-events: auto; 
     box-shadow: 0 10px 30px rgba(0,0,0,1);
     transition: opacity 0.2s;
     z-index: 200;
@@ -270,15 +264,21 @@ p { color: #666; font-size: 0.9rem; margin-bottom: 0; }
 .tooltip::after {
     content: '';
     position: absolute;
-    bottom: -20px;
+    bottom: -14px; 
+    height: 14px;
     left: 0;
     width: 100%;
-    height: 20px;
     background: transparent;
 }
+
 .tooltip strong { display: block; color: #fff; margin-bottom: 4px; font-size: 14px; }
-/* .tooltip span removed to allow inline formatting */
-.dot:hover .tooltip { visibility: visible; opacity: 1; }
+
+/* TOOLTIP TRIGGER */
+.dot:hover .tooltip,
+.dot.force-tooltip .tooltip { 
+    visibility: visible; 
+    opacity: 1; 
+}
 
 /* ADMIN TOOLTIP CONTROLS */
 .admin-controls {

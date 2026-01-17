@@ -77,6 +77,27 @@
         </div>
     </div>
 
+    <!-- ADMIN RESET MODAL -->
+    <div id="reset-options-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-content" style="text-align: center;">
+            <h3>Reset Votes</h3>
+            <p style="margin-bottom:20px; color:#aaa; font-size:13px;">Choose how to handle the reset:</p>
+            <input type="hidden" id="reset-item-id">
+            
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <button id="btn-bake" class="primary-btn" style="background:#059669;">Bake Consensus</button>
+                <div style="font-size:10px; color:#666;">Sets current average as the new default starting point.</div>
+                
+                <button id="btn-clear" class="primary-btn" style="background:#b91c1c; margin-top:10px;">Revert to Default</button>
+                <div style="font-size:10px; color:#666;">Removes all votes, snapping back to original start.</div>
+            </div>
+
+            <div style="margin-top:20px;">
+                <button id="reset-cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ADMIN CONTROLS -->
     <button id="global-reset-btn">MASTER RESET</button>
 

@@ -29,7 +29,7 @@ let isDragging = null;
 let previousData = {}; 
 let svgLayer = null;   
 let renderedItems = new Set();
-let viewMode = '2D'; // '1D' or '2D'
+let viewMode = '2D'; 
 const ADMIN_EMAIL = "rob.bredow@gmail.com";
 
 // --- INITIAL DATA SEED ---
@@ -55,7 +55,6 @@ const initialItems = [
     { id: "d19", name: "Text-to-Movie", x: 98, y: 5, desc: "One button to make a film. Pure fantasy right now." }
 ];
 
-// --- HELPER FUNCTIONS ---
 function throttle(func, limit) {
     let inThrottle;
     return function() {
@@ -69,7 +68,6 @@ function throttle(func, limit) {
     }
 }
 
-// --- AUTHENTICATION ---
 onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUser = user;
@@ -160,7 +158,6 @@ function initApp() {
         }
     };
     
-    // Restore mode state visually
     if (viewMode === '1D') container.classList.add('mode-1d');
 
     svgLayer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -279,7 +276,18 @@ function createItemElements(container, item) {
     if (isAdmin) tooltip.style.pointerEvents = 'auto'; 
     else tooltip.style.pointerEvents = 'none';
 
-    let html = `<strong>${item.name}</strong><span id="desc-${item.id}">${item.desc}</span><span>Consensus: <span id="val-${item.id}">${item.y}</span>%</span>`;
+    // NEW TOOLTIP STRUCTURE
+    let html = `
+        <div style="margin-bottom:2px;"><strong>${item.name}</strong></div>
+        <div id="desc-${item.id}" style="font-size:11px; color:#aaa; line-height:1.2; margin-bottom:4px;">${item.desc}</div>
+        <div style="font-size:10px; color:#888;">
+            <span style="color:#eee;">Generative: <b id="val-x-${item.id}">${Math.round(item.x)}</b>%</span> 
+            <span style="margin:0 4px; color:#444;">|</span> 
+            <span style="color:#eee;">Readiness: <b id="val-y-${item.id}">${Math.round(item.y)}</b>%</span>
+            <span id="my-vote-${item.id}" style="margin-left:6px; color:#3b82f6; display:none;"></span>
+        </div>
+    `;
+
     if (isAdmin) {
         html += `
             <div class="admin-controls">
@@ -335,45 +343,24 @@ function setupDrag(avgDot, userDot, item, container) {
     const updateFirebase = throttle((x, y) => {
         if(!currentUser) return;
         
-        // --- 1D MODE LOGIC ---
         if (viewMode === '1D') {
-            // Find existing Y value to preserve it
-            let targetY = 50; // default safe fallback
-            
-            // Check previous vote
+            let targetY = 50; 
             const itemVotes = previousData[item.id] || {};
             if (itemVotes[currentUser.uid]) {
                 targetY = itemVotes[currentUser.uid].y;
             } else {
-                // If no vote, use current Consensus Y (item.y from DB or DOM)
-                // We don't have direct access to 'item' LIVE object here easily without lookup
-                // but 'item' passed to setupDrag is the initial object.
-                // Better: Use DOM position of avgDot as proxy for consensus Y if needed?
-                // Actually, let's just use the 'item' object passed in. It might be stale? 
-                // JS objects are references. If updated in `onValue`, it might be fresh?
-                // No, createItemElements is called once. 'item' is static reference.
-                // We should look up the current avg from DOM or previousData.
-                
-                // Let's assume 50 if totally new, or use item.y (initial).
-                // But ideally we want the *current* consensus.
-                // Let's grab it from the DOM element style?
                 const avgDotDom = document.getElementById(`dot-${item.id}`);
                 if (avgDotDom) {
-                    // Inline style is set by JS, so it's accurate even if CSS overrides it visually
-                    const currentBottom = avgDotDom.style.bottom; // "98%"
+                    const currentBottom = avgDotDom.style.bottom; 
                     if(currentBottom) targetY = parseFloat(currentBottom);
                     else targetY = item.y;
                 }
             }
-
-            // Only update X, preserve Y
             set(ref(db, 'votes/' + item.id + '/' + currentUser.uid), {
                 x: Math.round(x * 10) / 10,
                 y: Math.round(targetY * 10) / 10
             });
-            
         } else {
-            // 2D Mode: Normal
             set(ref(db, 'votes/' + item.id + '/' + currentUser.uid), {
                 x: Math.round(x * 10) / 10,
                 y: Math.round(y * 10) / 10
@@ -404,34 +391,13 @@ function setupDrag(avgDot, userDot, item, container) {
         function moveAt(pageX, pageY) {
             let newX = pageX - shiftX - container.getBoundingClientRect().left;
             let newY = pageY - shiftY - container.getBoundingClientRect().top;
-            
             if (newX < 0) newX = 0;
             if (newX > container.clientWidth) newX = container.clientWidth;
             if (newY < 0) newY = 0;
             if (newY > container.clientHeight) newY = container.clientHeight;
-            
             let percentX = (newX / container.clientWidth) * 100;
             let percentY = 100 - ((newY / container.clientHeight) * 100);
             
-            // In 1D mode, visually snap User Dot to 50%?
-            // Yes, because the mouse Y shouldn't matter visually.
-            // But 'updateElementPosition' sets style.bottom.
-            // If CSS has !important, the JS value is ignored. 
-            // So we can just set it to percentY (mouse) and let CSS handle the squash.
-            // Wait, if we set it to mouse Y, the data attribute tempY gets mouse Y.
-            // We need tempY to be correct for the final commit.
-            
-            if (viewMode === '1D') {
-                // Determine the Y we WANT to save (Consensus or Previous)
-                // We calculated this in the throttle, but we need it here for the final commit.
-                // Let's re-use the logic or just store it.
-                // Simple hack: We won't update 'percentY' based on mouse.
-                // We will use the stored previous value.
-                
-                // ... Actually, let's just let percentY follow the mouse for now,
-                // BUT inside updateFirebase and onMouseUp, we override it.
-            }
-
             updateElementPosition(activeDot, percentX, percentY);
             updateFirebase(percentX, percentY);
             
@@ -456,10 +422,7 @@ function setupDrag(avgDot, userDot, item, container) {
             if (activeDot.dataset.tempX) {
                 let x = parseFloat(activeDot.dataset.tempX);
                 let y = parseFloat(activeDot.dataset.tempY);
-                
-                // FINAL COMMIT LOGIC FOR 1D
                 if (viewMode === '1D') {
-                     // Look up correct Y again
                      let targetY = 50;
                      const itemVotes = previousData[item.id] || {};
                      if (itemVotes[currentUser.uid]) {
@@ -474,7 +437,6 @@ function setupDrag(avgDot, userDot, item, container) {
                      }
                      y = targetY;
                 }
-
                 set(ref(db, 'votes/' + item.id + '/' + currentUser.uid), {
                     x: Math.round(x * 10) / 10,
                     y: Math.round(y * 10) / 10
@@ -514,8 +476,22 @@ function updateGraphFromData(allVotes, container) {
                 updateDotColor(avgDot, avgY);
                 const label = document.getElementById(`label-${itemId}`);
                 if(label) updateLabelPosition(label, avgY);
-                const valSpan = document.getElementById(`val-${itemId}`);
-                if(valSpan) valSpan.innerText = Math.round(avgY);
+                
+                // UPDATE TOOLTIP VALUES
+                const valX = document.getElementById(`val-x-${itemId}`);
+                const valY = document.getElementById(`val-y-${itemId}`);
+                if(valX) valX.innerText = Math.round(avgX);
+                if(valY) valY.innerText = Math.round(avgY);
+                
+                const myVoteDiv = document.getElementById(`my-vote-${itemId}`);
+                if(myVoteDiv) {
+                    if(myVote) {
+                        myVoteDiv.style.display = 'inline';
+                        myVoteDiv.innerHTML = `<span style="color:#444">|</span> Me: <b>${Math.round(myVote.x)}/${Math.round(myVote.y)}</b>`;
+                    } else {
+                        myVoteDiv.style.display = 'none';
+                    }
+                }
             }
             const userDot = document.getElementById(`user-dot-${itemId}`);
             if (userDot && myVote && isDragging !== itemId) updateConnectionLine(itemId, avgX, avgY, myVote.x, myVote.y);

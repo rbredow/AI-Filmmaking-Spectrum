@@ -30,7 +30,7 @@ let isDragging = null;
 let previousData = {};
 let svgLayer = null;
 let renderedItems = new Set();
-let viewMode = '2D';
+let viewMode = '1D';
 const ADMIN_EMAIL = "rob.bredow@gmail.com";
 let userDisplayName = "";
 let hasConfirmedName = false;
@@ -174,6 +174,10 @@ function initApp() {
         <div class="axis-label y-label-top">Ready</div>
         <div class="axis-label y-label-bottom">Not Ready</div>
         <div id="add-item-btn" title="Add New Tool">+</div>
+        <div id="search-container">
+            <span id="search-icon">🔍</span>
+            <input type="text" id="search-input" placeholder="Search...">
+        </div>
         <div id="view-mode-btn" title="Toggle 1D/2D View">2D</div>
     `;
     renderedItems.clear();
@@ -193,6 +197,29 @@ function initApp() {
     };
 
     if (viewMode === '1D') container.classList.add('mode-1d');
+
+    // Setup Search Logic
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        searchInput.oninput = (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            const container = document.getElementById('graph-container');
+            if (query) {
+                container.classList.add('searching');
+                renderedItems.forEach(id => {
+                    const dot = document.getElementById(`dot-${id}`);
+                    const label = document.getElementById(`label-${id}`);
+                    const isMatch = label && label.innerText.toLowerCase().includes(query);
+                    if (dot) {
+                        if (isMatch) dot.classList.add('search-match');
+                        else dot.classList.remove('search-match');
+                    }
+                });
+            } else {
+                container.classList.remove('searching');
+            }
+        };
+    }
 
     svgLayer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svgLayer.id = "connections-layer";
@@ -816,6 +843,44 @@ function updateDotColor(dot, y) {
 function updateLabelPosition(labelElement, y) {
     labelElement.classList.remove('label-below', 'label-above');
     if (y > 65) labelElement.classList.add('label-below'); else labelElement.classList.add('label-above');
+
+    // CONFLICT RESOLUTION: Stagger labels if they are too close in Y
+    const currentId = labelElement.id.replace('label-', '');
+    let offset = 0;
+
+    renderedItems.forEach(otherId => {
+        if (currentId === otherId) return;
+        const otherLabel = document.getElementById(`label-${otherId}`);
+        if (!otherLabel) return;
+
+        const otherDot = document.getElementById(`dot-${otherId}`);
+        const thisDot = document.getElementById(`dot-${currentId}`);
+        if (!otherDot || !thisDot) return;
+
+        const thisX = parseFloat(thisDot.style.left);
+        const thisY = parseFloat(thisDot.style.bottom);
+        const otherX = parseFloat(otherDot.style.left);
+        const otherY = parseFloat(otherDot.style.bottom);
+
+        // If dots are within 2% of each other in both axes
+        if (Math.abs(thisY - otherY) < 2.5 && Math.abs(thisX - otherX) < 8) {
+            // If this dot is slightly below the other, push it further down or up
+            if (thisY <= otherY) {
+                offset += 15; // Stagger by 15px
+            }
+        }
+    });
+
+    if (offset > 0) {
+        const isBelow = labelElement.classList.contains('label-below');
+        if (isBelow) {
+            labelElement.style.transform = `rotate(45deg) translate(${15 + offset}px, 0)`;
+        } else {
+            labelElement.style.transform = `translate(10px, ${-25 - offset}px) rotate(45deg)`;
+        }
+    } else {
+        labelElement.style.transform = '';
+    }
 }
 
 window.deleteItem = (id) => { if (confirm("Are you sure you want to delete this item?")) { remove(ref(db, 'items/' + id)); remove(ref(db, 'votes/' + id)); } };

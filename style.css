@@ -21,21 +21,23 @@ h2 {
 
 p {
     color: #666;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     margin-bottom: 0;
 }
 
 #header {
-    margin-bottom: 60px;
+    margin-bottom: 40px;
     text-align: center;
+    width: 90%;
 }
 
 #graph-container {
     position: relative;
     width: 90%;
-    max-width: 1200px;
-    height: 500px;
-    border-bottom: 1px solid #333;
+    max-width: 1400px;
+    height: 80vh;
+    min-height: 400px;
+    border-bottom: 1px solid #666;
     background: linear-gradient(to bottom, #111 0%, #050505 100%);
     margin-bottom: 80px;
     transition: background 3s;
@@ -57,7 +59,7 @@ p {
 /* Axis Labels */
 .axis-label {
     position: absolute;
-    color: #444;
+    color: #888;
     font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
@@ -94,7 +96,7 @@ p {
     position: absolute;
     top: -30px;
     right: 0;
-    color: #444;
+    color: #888;
     font-size: 24px;
     font-weight: 700;
     cursor: pointer;
@@ -113,7 +115,7 @@ p {
     position: absolute;
     top: -30px;
     right: 40px;
-    color: #444;
+    color: #888;
     font-size: 14px;
     font-weight: 700;
     cursor: pointer;
@@ -153,6 +155,68 @@ p {
     background: #333;
     color: #ccc;
     border-color: #555;
+}
+
+/* --- SEARCH BAR --- */
+#search-container {
+    position: absolute;
+    top: -32px;
+    right: 85px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #111;
+    border: 1px solid #333;
+    padding: 0 8px;
+    border-radius: 4px;
+    transition: all 0.3s;
+}
+
+#search-container:focus-within {
+    border-color: #3b82f6;
+    background: #1a1a1a;
+}
+
+#search-input {
+    background: transparent;
+    border: none;
+    color: #eee;
+    font-size: 12px;
+    padding: 4px 0;
+    width: 80px;
+    outline: none;
+    transition: width 0.3s;
+}
+
+#search-input:focus {
+    width: 150px;
+}
+
+#search-icon {
+    font-size: 14px;
+    color: #888;
+}
+
+/* SEARCH DIMMING */
+.searching .dot,
+.searching .voter-dot,
+.searching .connection-line {
+    opacity: 0.1 !important;
+}
+
+.searching .dot.search-match,
+.searching .voter-dot.search-match {
+    opacity: 1 !important;
+    z-index: 500;
+}
+
+.searching .dot.search-match .dot-label {
+    color: #fff;
+    opacity: 1 !important;
+}
+
+.searching .dot.search-match .voter-username {
+    opacity: 1 !important;
 }
 
 .grid-line {
@@ -626,12 +690,34 @@ button:hover {
 }
 
 @media (max-width: 600px) {
+    #header {
+        margin-bottom: 45px;
+    }
+
     #graph-container {
-        height: 500px;
+        height: 70vh;
         width: 95%;
+        margin-bottom: 40px;
     }
 
     .dot-label {
         font-size: 10px;
+    }
+
+    #search-container {
+        right: 75px;
+    }
+
+    #search-input:focus {
+        width: 100px;
+    }
+
+    .axis-label {
+        font-size: 9px;
+    }
+
+    .y-label-bottom {
+        left: -60px;
+        width: 50px;
     }
 }

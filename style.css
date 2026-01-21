@@ -5,10 +5,11 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
     min-height: 100vh;
     margin: 0;
-    overflow: hidden;
+    padding: 40px 20px;
+    box-sizing: border-box;
+    overflow-y: auto;
 }
 
 h2 {
@@ -29,17 +30,44 @@ p {
     margin-bottom: 40px;
     text-align: center;
     width: 90%;
+    position: relative;
+}
+
+#user-display {
+    position: absolute;
+    top: 0;
+    right: 0;
+    font-size: 11px;
+    color: #888;
+    background: #1a1a1a;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid #333;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+#user-display:hover {
+    color: #fff;
+    border-color: #3b82f6;
+    background: #222;
+}
+
+#user-display span {
+    color: #3b82f6;
+    font-weight: bold;
 }
 
 #graph-container {
     position: relative;
     width: 90%;
     max-width: 1400px;
-    height: 80vh;
-    min-height: 400px;
+    height: calc(100vh - 250px);
+    min-height: 350px;
     border-bottom: 1px solid #666;
     background: linear-gradient(to bottom, #111 0%, #050505 100%);
-    margin-bottom: 80px;
+    margin-bottom: 40px;
     transition: background 3s;
 }
 

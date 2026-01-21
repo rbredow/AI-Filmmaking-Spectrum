@@ -94,11 +94,39 @@ onAuthStateChanged(auth, (user) => {
             userDisplayName = localStorage.getItem('voter_name') || generateDefaultUsername();
             hasConfirmedName = !!localStorage.getItem('voter_name_confirmed');
         }
+        updateUsernameUI();
         initApp();
     } else {
         signInAnonymously(auth).catch(e => console.error("Anon Auth failed", e));
     }
 });
+
+function updateUsernameUI() {
+    const nameSpan = document.getElementById('current-username');
+    if (nameSpan) nameSpan.innerText = userDisplayName;
+}
+
+async function updateAllUserVotes(newName) {
+    if (!currentUser) return;
+    const updates = {};
+    let hasUpdates = false;
+
+    // previousData contains all votes: { itemId: { uid: { x, y, username } } }
+    for (const [itemId, votes] of Object.entries(previousData)) {
+        if (votes[currentUser.uid]) {
+            updates[`votes/${itemId}/${currentUser.uid}/username`] = newName;
+            hasUpdates = true;
+        }
+    }
+
+    if (hasUpdates) {
+        try {
+            await update(ref(db), updates);
+        } catch (e) {
+            console.error("Failed to update usernames on votes", e);
+        }
+    }
+}
 
 function showUsernamePrompt() {
     const modal = document.getElementById('username-modal');
@@ -111,7 +139,7 @@ function showUsernamePrompt() {
         input.focus();
         input.select();
 
-        submitBtn.onclick = () => {
+        submitBtn.onclick = async () => {
             const val = input.value.trim();
             if (val) {
                 userDisplayName = val;
@@ -119,12 +147,14 @@ function showUsernamePrompt() {
                 localStorage.setItem('voter_name', userDisplayName);
                 localStorage.setItem('voter_name_confirmed', 'true');
                 modal.style.display = 'none';
+                updateUsernameUI();
+                await updateAllUserVotes(val);
             }
         };
 
         // Also handle 'Enter' key
         input.onkeydown = (e) => {
-            if (e.key === 'Enter') submitBtn.onclick();
+            if (e.key === 'Enter') submitBtn.click();
         };
     } else {
         // Fallback if elements not found
@@ -231,6 +261,10 @@ function initApp() {
     setupEditModalLogic();
     setupResetModalLogic();
     setupGlobalResetLogic();
+
+    // Bind username click to modal
+    const userDisplay = document.getElementById('user-display');
+    if (userDisplay) userDisplay.onclick = () => showUsernamePrompt();
 
     const itemsRef = ref(db, 'items');
     onValue(itemsRef, (snapshot) => {

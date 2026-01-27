@@ -6,11 +6,12 @@ body {
     flex-direction: column;
     align-items: center;
     min-height: 100vh;
+    min-height: 100dvh; /* Dynamic viewport height for mobile */
     margin: 0;
     padding: 40px 20px;
     box-sizing: border-box;
     overflow-y: auto;
-    -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
+    -webkit-tap-highlight-color: transparent;
 }
 
 h2 {
@@ -72,7 +73,7 @@ p {
     background: linear-gradient(to bottom, #111 0%, #050505 100%);
     margin-bottom: 40px;
     transition: background 3s;
-    touch-action: none; /* Prevent browser gestures while interacting */
+    touch-action: none;
 }
 
 /* Y-Axis Indicator */
@@ -140,7 +141,7 @@ p {
     transition:
         color 0.2s,
         transform 0.2s;
-    padding: 5px; /* Larger touch target */
+    padding: 5px;
 }
 
 #add-item-btn:hover {
@@ -228,7 +229,7 @@ p {
     background: transparent;
     border: none;
     color: #eee;
-    font-size: 16px; /* Prevents iOS zoom on focus */
+    font-size: 16px;
     padding: 4px 0;
     width: 80px;
     outline: none;
@@ -705,13 +706,13 @@ p {
     border: 1px solid #444;
     color: #fff;
     border-radius: 4px;
-    font-size: 16px; /* Prevents iOS zoom */
+    font-size: 16px;
 }
 
 .form-group input[type="range"] {
     width: 100%;
     margin: 10px 0;
-    height: 30px; /* Larger touch target */
+    height: 30px;
 }
 
 .slider-labels {
@@ -737,7 +738,7 @@ button {
     background: #333;
     color: #ccc;
     font-size: 14px;
-    min-height: 44px; /* Touch-friendly */
+    min-height: 44px;
     min-width: 44px;
 }
 
@@ -827,50 +828,150 @@ button:active {
     }
 }
 
-/* Mobile */
+/* Mobile - NO SCROLL LAYOUT */
 @media (max-width: 600px) {
+    html,
     body {
-        padding: 10px 5px;
-        padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+        overflow: hidden !important; /* Prevent all scrolling */
+        height: 100%;
+        height: 100dvh;
+        position: fixed; /* Prevent iOS bounce scroll */
+        width: 100%;
+    }
+
+    body {
+        padding: 0;
+        margin: 0;
+        justify-content: flex-start;
     }
 
     #header {
-        margin-bottom: 20px;
-        padding: 0 10px;
+        margin: 0;
+        padding: 8px 15px;
+        width: 100%;
+        box-sizing: border-box;
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
         align-items: center;
+        justify-content: space-between;
+        background: #0a0a0a;
+        flex-shrink: 0;
+        border-bottom: 1px solid #222;
     }
 
     #header h2 {
-        font-size: 1.2rem;
-        order: 1;
+        font-size: 1rem;
+        margin: 0;
+        white-space: nowrap;
     }
 
     #header p {
-        font-size: 0.7rem;
-        order: 2;
+        display: none; /* Hide subtitle on mobile */
     }
 
     #user-display {
         position: relative;
-        margin-top: 10px;
-        order: 3;
+        top: auto;
+        right: auto;
+        margin: 0;
+        font-size: 10px;
+        padding: 3px 8px;
     }
 
     #graph-container {
-        height: calc(100vh - 220px);
-        min-height: 280px;
-        width: calc(100% - 10px);
-        margin-bottom: 60px;
-        margin-left: 5px;
-        margin-right: 5px;
+        width: 100%;
+        height: calc(100dvh - 45px); /* Full height minus header */
+        height: calc(100vh - 45px); /* Fallback */
+        min-height: 0; /* Remove min-height constraint */
+        margin: 0;
+        border: none;
+        border-radius: 0;
+        flex-grow: 1;
+    }
+
+    /* Controls - overlay inside graph container */
+    #add-item-btn,
+    #view-mode-btn,
+    #search-container {
+        top: 10px;
+        bottom: auto;
+        z-index: 100;
+    }
+
+    #add-item-btn {
+        right: 10px;
+        font-size: 24px;
+        padding: 8px;
+        background: rgba(0, 0, 0, 0.6);
+        border-radius: 8px;
+    }
+
+    #view-mode-btn {
+        right: 55px;
+        font-size: 11px;
+        padding: 6px 10px;
+        line-height: 16px;
+        background: rgba(0, 0, 0, 0.6);
+    }
+
+    #search-container {
+        left: 10px;
+        right: auto;
+        padding: 4px 8px;
+        background: rgba(0, 0, 0, 0.6);
+    }
+
+    #search-input {
+        width: 60px;
+        font-size: 14px;
+    }
+
+    #search-input:focus {
+        width: 100px;
+    }
+
+    /* Axis labels - compact inside graph */
+    .axis-label {
+        font-size: 7px;
+        letter-spacing: 0;
+        opacity: 0.5;
+    }
+
+    .x-label-left {
+        bottom: 8px;
+        left: 10px;
+    }
+
+    .x-label-right {
+        bottom: 8px;
+        right: 10px;
+    }
+
+    .y-label-top {
+        top: 50px; /* Below controls */
+        left: 8px;
+    }
+
+    .y-label-bottom {
+        bottom: 25px;
+        left: 8px;
+        width: auto;
+        text-align: left;
+    }
+
+    /* Y-axis gradient - inside graph */
+    .y-axis-gradient {
+        left: 3px;
+        top: 45px;
+        bottom: 20px;
+        width: 2px;
+        opacity: 0.4;
     }
 
     /* Larger touch targets for dots */
     .dot {
-        width: 20px;
-        height: 20px;
+        width: 18px;
+        height: 18px;
     }
 
     .dot::before {
@@ -881,8 +982,8 @@ button:active {
     }
 
     .user-dot {
-        width: 24px;
-        height: 24px;
+        width: 22px;
+        height: 22px;
     }
 
     .user-dot::before {
@@ -893,83 +994,16 @@ button:active {
     }
 
     .user-dot::after {
-        width: 6px;
-        height: 6px;
+        width: 5px;
+        height: 5px;
     }
 
     /* Labels */
     .dot-label {
-        font-size: 11px;
+        font-size: 10px;
     }
 
-    /* Controls row - reposition below graph */
-    #add-item-btn,
-    #view-mode-btn,
-    #search-container {
-        top: auto;
-        bottom: -50px;
-    }
-
-    #add-item-btn {
-        right: 10px;
-        font-size: 28px;
-        padding: 8px;
-    }
-
-    #view-mode-btn {
-        right: 55px;
-        font-size: 12px;
-        padding: 6px 12px;
-        line-height: 20px;
-    }
-
-    #search-container {
-        left: 10px;
-        right: auto;
-        padding: 4px 10px;
-    }
-
-    #search-input {
-        width: 80px;
-        font-size: 16px;
-    }
-
-    #search-input:focus {
-        width: 120px;
-    }
-
-    /* Axis labels */
-    .axis-label {
-        font-size: 8px;
-        letter-spacing: 0;
-    }
-
-    .x-label-left,
-    .x-label-right {
-        bottom: -70px;
-    }
-
-    .x-label-left {
-        left: 10px;
-    }
-
-    .x-label-right {
-        right: 10px;
-    }
-
-    .y-label-bottom {
-        left: -50px;
-        width: 45px;
-        font-size: 7px;
-    }
-
-    .y-label-top {
-        top: -20px;
-        left: 5px;
-        font-size: 8px;
-    }
-
-    /* Tooltips - bottom sheet on mobile */
+    /* Tooltips - bottom sheet */
     .tooltip {
         position: fixed !important;
         bottom: 0 !important;
@@ -980,11 +1014,14 @@ button:active {
         max-width: none !important;
         transform: none !important;
         border-radius: 16px 16px 0 0;
-        padding: 20px;
-        padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+        padding: 16px 20px;
+        padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
         z-index: 500;
         box-sizing: border-box;
-        font-size: 14px;
+        font-size: 13px;
+        max-height: 40vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .tooltip::after {
@@ -992,14 +1029,14 @@ button:active {
     }
 
     .tooltip strong {
-        font-size: 16px;
-        margin-bottom: 8px;
+        font-size: 15px;
+        margin-bottom: 6px;
     }
 
-    /* Modals */
+    /* Modals - bottom sheet style */
     .modal-overlay {
-        padding: 10px;
-        align-items: flex-end; /* Slide up from bottom */
+        padding: 0;
+        align-items: flex-end;
     }
 
     .modal-content {
@@ -1007,64 +1044,67 @@ button:active {
         max-width: none;
         padding: 20px;
         padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-        max-height: 85vh;
+        max-height: 80vh;
+        max-height: 80dvh;
         border-radius: 16px 16px 0 0;
-        margin-bottom: 0;
+        margin: 0;
     }
 
     .modal-content h3 {
-        font-size: 18px;
+        font-size: 16px;
     }
 
     .form-group input[type="text"] {
         padding: 12px;
-        font-size: 16px;
     }
 
     .form-group input[type="range"] {
-        height: 40px;
+        height: 36px;
     }
 
     /* Voter dots */
     .voter-dot {
-        width: 12px;
-        height: 12px;
+        width: 10px;
+        height: 10px;
     }
 
     .voter-username {
-        font-size: 8px;
+        font-size: 7px;
     }
 
     .user-dot .voter-username {
-        font-size: 9px;
-        bottom: 22px;
+        font-size: 8px;
+        bottom: 20px;
     }
 
-    /* Admin controls in tooltip */
+    /* Admin controls */
     .admin-controls {
         flex-wrap: wrap;
-        gap: 8px;
+        gap: 6px;
     }
 
     .admin-btn {
-        padding: 10px 14px;
-        font-size: 12px;
+        padding: 8px 12px;
+        font-size: 11px;
         flex: 1;
         text-align: center;
-        min-height: 44px;
+        min-height: 40px;
         display: flex;
         align-items: center;
         justify-content: center;
     }
 
-    /* Global reset button */
+    /* Global reset button - move to top */
     #global-reset-btn {
-        bottom: auto;
+        position: absolute;
         top: 10px;
-        left: 10px;
-        font-size: 9px;
-        padding: 6px 10px;
-        min-height: 32px;
+        bottom: auto;
+        left: auto;
+        right: 100px;
+        font-size: 7px;
+        padding: 4px 6px;
+        min-height: 28px;
+        background: rgba(0, 0, 0, 0.6);
     }
 
     /* Modal buttons */
@@ -1075,104 +1115,126 @@ button:active {
 
     .modal-actions button {
         width: 100%;
-        padding: 14px;
-        font-size: 16px;
-    }
-}
-
-/* Very small screens */
-@media (max-width: 380px) {
-    #header h2 {
-        font-size: 1rem;
-    }
-
-    #header p {
-        font-size: 0.65rem;
-    }
-
-    .dot-label {
-        font-size: 9px;
-    }
-
-    .tooltip {
-        font-size: 13px;
-        padding: 16px;
-    }
-
-    .tooltip strong {
+        padding: 12px;
         font-size: 15px;
     }
 
-    #search-input {
-        width: 60px;
+    /* Grid lines */
+    .grid-x {
+        opacity: 0.3;
     }
 
-    #search-input:focus {
-        width: 100px;
-    }
-
-    #view-mode-btn {
-        right: 50px;
-        padding: 4px 8px;
-        font-size: 11px;
-    }
-
-    #add-item-btn {
-        right: 5px;
-        font-size: 24px;
+    .grid-y {
+        opacity: 0.3;
     }
 }
 
-/* Landscape mobile */
-@media (max-height: 500px) and (orientation: landscape) {
-    body {
-        padding: 10px;
-    }
-
-    #header {
-        margin-bottom: 10px;
-        flex-direction: row;
-        justify-content: space-between;
-        align-items: center;
-    }
-
+/* Very small screens (iPhone SE, etc) */
+@media (max-width: 380px) {
     #header h2 {
-        order: 1;
-        margin: 0;
-    }
-
-    #header p {
-        display: none;
+        font-size: 0.85rem;
     }
 
     #user-display {
-        position: relative;
-        order: 2;
-        margin: 0;
+        font-size: 9px;
+        padding: 2px 6px;
+    }
+
+    .dot-label {
+        font-size: 8px;
+    }
+
+    .tooltip {
+        font-size: 12px;
+        padding: 12px 14px;
+    }
+
+    .tooltip strong {
+        font-size: 14px;
+    }
+
+    #search-container {
+        display: none; /* Hide search on very small screens */
+    }
+
+    #view-mode-btn {
+        right: 45px;
+        font-size: 10px;
+        padding: 4px 8px;
+    }
+
+    #add-item-btn {
+        font-size: 22px;
+    }
+
+    #global-reset-btn {
+        right: 80px;
+        font-size: 6px;
+        padding: 3px 5px;
+    }
+
+    .axis-label {
+        font-size: 6px;
+    }
+}
+
+/* Landscape mobile - also no scroll */
+@media (max-height: 500px) and (orientation: landscape) {
+    html,
+    body {
+        overflow: hidden !important;
+        position: fixed;
+        width: 100%;
+    }
+
+    body {
+        padding: 0;
+    }
+
+    #header {
+        padding: 4px 15px;
+    }
+
+    #header h2 {
+        font-size: 0.85rem;
     }
 
     #graph-container {
-        height: calc(100vh - 100px);
-        min-height: 180px;
-        margin-bottom: 50px;
+        height: calc(100dvh - 35px);
+        height: calc(100vh - 35px);
     }
 
     .tooltip {
         max-height: 50vh;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
+        max-height: 50dvh;
     }
 
     .modal-content {
-        max-height: 80vh;
+        max-height: 90vh;
+        max-height: 90dvh;
     }
 
-    /* Keep controls at top in landscape */
+    .axis-label {
+        font-size: 6px;
+    }
+
+    .dot-label {
+        font-size: 8px;
+    }
+
+    /* Controls even more compact */
     #add-item-btn,
     #view-mode-btn,
     #search-container {
-        top: -28px;
-        bottom: auto;
+        top: 5px;
+    }
+
+    .y-label-top {
+        top: 35px;
+    }
+
+    .y-axis-gradient {
+        top: 30px;
     }
 }
 
@@ -1218,15 +1280,6 @@ button:active {
         opacity: 1;
     }
 
-    /* Larger touch targets */
-    #add-item-btn {
-        padding: 10px;
-    }
-
-    #view-mode-btn {
-        padding: 8px 14px;
-    }
-
     /* Disable text selection during drag */
     #graph-container {
         -webkit-user-select: none;
@@ -1256,17 +1309,19 @@ button:active {
 /* ========================================= */
 
 @supports (padding: env(safe-area-inset-bottom)) {
-    body {
-        padding-left: env(safe-area-inset-left);
-        padding-right: env(safe-area-inset-right);
-    }
+    @media (max-width: 600px) {
+        #graph-container {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
 
-    .modal-overlay {
-        padding-bottom: env(safe-area-inset-bottom);
-    }
+        .y-label-bottom {
+            bottom: calc(25px + env(safe-area-inset-bottom));
+        }
 
-    #global-reset-btn {
-        left: calc(10px + env(safe-area-inset-left));
+        .x-label-left,
+        .x-label-right {
+            bottom: calc(8px + env(safe-area-inset-bottom));
+        }
     }
 }
 
@@ -1294,19 +1349,17 @@ button:active {
 }
 
 /* ========================================= */
-/*            DARK MODE SUPPORT             */
-/* ========================================= */
-
-@media (prefers-color-scheme: light) {
-    /* If someone has light mode preference, we keep dark anyway for this app
-       but you could add light theme styles here */
-}
-
-/* ========================================= */
 /*              PRINT STYLES                */
 /* ========================================= */
 
 @media print {
+    html,
+    body {
+        overflow: visible !important;
+        position: static !important;
+        height: auto !important;
+    }
+
     body {
         background: white;
         color: black;
@@ -1315,6 +1368,7 @@ button:active {
     #graph-container {
         background: white;
         border: 1px solid #ccc;
+        height: 80vh;
     }
 
     .tooltip,

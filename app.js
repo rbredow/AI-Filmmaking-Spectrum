@@ -28,6 +28,7 @@ let currentUser = null;
 let isAdmin = false;
 let isDragging = null;
 let previousData = {};
+let itemsCache = {}; // Local cache of items for weighted calculations
 let svgLayer = null;
 let renderedItems = new Set();
 let viewMode = '1D';
@@ -269,6 +270,7 @@ function initApp() {
     const itemsRef = ref(db, 'items');
     onValue(itemsRef, (snapshot) => {
         const itemsData = snapshot.val();
+        itemsCache = itemsData || {};
         if (!itemsData) {
             const updates = {};
             initialItems.forEach(item => { updates['items/' + item.id] = item; });
@@ -705,10 +707,20 @@ function setupDrag(avgDot, userDot, item, container) {
 function updateGraphFromData(allVotes, container) {
     renderedItems.forEach(itemId => {
         const itemVotes = allVotes[itemId] || {};
+        const baseItem = itemsCache[itemId];
         const prevItemVotes = (previousData[itemId] || {});
+
+        if (!baseItem) return;
 
         // Track which voter dots should exist
         const activeVoters = new Set();
+
+        // --- WEIGHTED AVERAGE CALCULATION ---
+        // We give the baseline (default) position a weight of 10
+        // And each user vote a weight of 1.
+        let totalX = baseItem.x * 10;
+        let totalY = baseItem.y * 10;
+        let count = 10;
 
         Object.keys(itemVotes).forEach(uid => {
             if (uid === currentUser?.uid && isDragging === itemId) {
@@ -749,6 +761,11 @@ function updateGraphFromData(allVotes, container) {
             } else {
                 activeVoters.add(uid);
             }
+
+            // Add to weighted totals
+            totalX += vote.x;
+            totalY += vote.y;
+            count++;
         });
 
         // Cleanup old voter dots
@@ -758,48 +775,64 @@ function updateGraphFromData(allVotes, container) {
             if (!activeVoters.has(uid)) dot.remove();
         });
 
-        let totalX = 0, totalY = 0, count = 0;
         let myVote = null;
-        if (currentUser && itemVotes[currentUser.uid]) myVote = itemVotes[currentUser.uid];
-        Object.values(itemVotes).forEach(vote => {
-            totalX += vote.x; totalY += vote.y; count++;
-        });
-        if (count > 0) {
-            let avgX = totalX / count;
-            let avgY = totalY / count;
-
-            const avgDot = document.getElementById(`dot-${itemId}`);
-            if (avgDot) {
-                // If I am dragging THIS item, kill the transition on the Consensus Dot so it follows instantly
-                if (isDragging === itemId) {
-                    avgDot.style.transition = 'none';
+        if (currentUser && itemVotes[currentUser.uid]) {
+            myVote = itemVotes[currentUser.uid];
+            // If dragging, we use the local temp position for the average calculation
+            // to provide real-time feedback.
+            if (isDragging === itemId) {
+                const userDot = document.getElementById(`user-dot-${itemId}`);
+                if (userDot && userDot.dataset.tempX) {
+                    const tx = parseFloat(userDot.dataset.tempX);
+                    const ty = parseFloat(userDot.dataset.tempY);
+                    totalX += tx;
+                    totalY += ty;
+                    count++;
                 } else {
-                    avgDot.style.transition = ''; // Revert to CSS default (3s)
-                }
-
-                updateElementPosition(avgDot, avgX, avgY);
-                updateDotColor(avgDot, avgY);
-                const label = document.getElementById(`label-${itemId}`);
-                if (label) updateLabelPosition(label, avgY);
-
-                // UPDATE TOOLTIP VALUES
-                const valX = document.getElementById(`val-x-${itemId}`);
-                const valY = document.getElementById(`val-y-${itemId}`);
-                if (valX) valX.innerText = Math.round(avgX);
-                if (valY) valY.innerText = Math.round(avgY);
-
-                const myVoteDiv = document.getElementById(`my-vote-${itemId}`);
-                if (myVoteDiv) {
-                    if (myVote) {
-                        myVoteDiv.style.display = 'inline';
-                        myVoteDiv.innerHTML = `<span style="color:#444">|</span> Me: <b>${Math.round(myVote.x)}/${Math.round(myVote.y)}</b>`;
-                    } else {
-                        myVoteDiv.style.display = 'none';
-                    }
+                    totalX += myVote.x;
+                    totalY += myVote.y;
+                    count++;
                 }
             }
-            const userDot = document.getElementById(`user-dot-${itemId}`);
-            if (userDot && myVote) {
+        }
+
+        let avgX = totalX / count;
+        let avgY = totalY / count;
+
+        const avgDot = document.getElementById(`dot-${itemId}`);
+        if (avgDot) {
+            // If I am dragging THIS item, kill the transition on the Consensus Dot so it follows instantly
+            if (isDragging === itemId) {
+                avgDot.style.transition = 'none';
+            } else {
+                avgDot.style.transition = ''; // Revert to CSS default (3s)
+            }
+
+            updateElementPosition(avgDot, avgX, avgY);
+            updateDotColor(avgDot, avgY);
+            const label = document.getElementById(`label-${itemId}`);
+            if (label) updateLabelPosition(label, avgY);
+
+            // UPDATE TOOLTIP VALUES
+            const valX = document.getElementById(`val-x-${itemId}`);
+            const valY = document.getElementById(`val-y-${itemId}`);
+            if (valX) valX.innerText = Math.round(avgX);
+            if (valY) valY.innerText = Math.round(avgY);
+
+            const myVoteDiv = document.getElementById(`my-vote-${itemId}`);
+            if (myVoteDiv) {
+                if (myVote) {
+                    myVoteDiv.style.display = 'inline';
+                    myVoteDiv.innerHTML = `<span style="color:#444">|</span> Me: <b>${Math.round(myVote.x)}/${Math.round(myVote.y)}</b>`;
+                } else {
+                    myVoteDiv.style.display = 'none';
+                }
+            }
+        }
+        const userDot = document.getElementById(`user-dot-${itemId}`);
+        if (userDot) {
+            if (myVote) {
+                userDot.style.display = 'block';
                 // Ensure name is on user dot
                 let nameLabel = userDot.querySelector('.voter-username');
                 if (!nameLabel) {
@@ -823,19 +856,13 @@ function updateGraphFromData(allVotes, container) {
                 }
 
                 if (isDragging !== itemId) {
+                    updateElementPosition(userDot, myVote.x, myVote.y);
                     updateConnectionLine(itemId, avgX, avgY, myVote.x, myVote.y);
                 } else {
                     const currentDomLeft = parseFloat(userDot.style.left);
                     const currentDomBottom = parseFloat(userDot.style.bottom);
                     updateConnectionLine(itemId, avgX, avgY, currentDomLeft, currentDomBottom);
                 }
-            }
-        }
-        const userDot = document.getElementById(`user-dot-${itemId}`);
-        if (userDot && isDragging !== itemId) {
-            if (myVote) {
-                userDot.style.display = 'block';
-                updateElementPosition(userDot, myVote.x, myVote.y);
             } else {
                 userDot.style.display = 'none';
                 const line = document.getElementById(`line-${itemId}`);

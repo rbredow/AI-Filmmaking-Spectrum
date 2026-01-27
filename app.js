@@ -456,6 +456,8 @@ function setupVoteConfirmModal() {
     const modal = document.getElementById('confirm-vote-modal');
     const cancelBtn = document.getElementById('vote-cancel-btn');
     const submitBtn = document.getElementById('vote-submit-btn');
+    const nameInput = document.getElementById('confirm-vote-username-input');
+    const nameSection = document.getElementById('confirm-vote-username-section');
 
     cancelBtn.onclick = () => {
         isConfirmingVote = false;
@@ -465,7 +467,28 @@ function setupVoteConfirmModal() {
         }
     };
 
-    submitBtn.onclick = () => {
+    submitBtn.onclick = async () => {
+        // If name input is visible, validate and save it
+        if (nameSection.style.display !== 'none') {
+            const val = nameInput.value.trim();
+            if (!val) return alert("Please enter a username.");
+
+            userDisplayName = val;
+            hasConfirmedName = true;
+            localStorage.setItem('voter_name', userDisplayName);
+            localStorage.setItem('voter_name_confirmed', 'true');
+            updateUsernameUI();
+
+            // Update the vote we just cast with the new name
+            if (modal.dataset.itemId && currentUser) {
+                update(ref(db, 'votes/' + modal.dataset.itemId + '/' + currentUser.uid), {
+                    username: userDisplayName
+                });
+            }
+            // Update all past votes just in case (though likely none for new user)
+            // await updateAllUserVotes(val); 
+        }
+
         isConfirmingVote = false;
         modal.style.display = 'none';
     };
@@ -721,6 +744,8 @@ function setupDrag(avgDot, userDot, item, container) {
                 const modal = document.getElementById('confirm-vote-modal');
                 const title = document.getElementById('confirm-vote-title');
                 const stats = document.getElementById('confirm-vote-stats');
+                const nameSection = document.getElementById('confirm-vote-username-section');
+                const nameInput = document.getElementById('confirm-vote-username-input');
 
                 modal.dataset.itemId = item.id;
                 title.innerText = `Vote for ${item.name}`;
@@ -730,13 +755,21 @@ function setupDrag(avgDot, userDot, item, container) {
                         <strong>Readiness:</strong> ${Math.round(y)}%
                     </div>
                 `;
+
+                if (!hasConfirmedName) {
+                    nameSection.style.display = 'block';
+                    nameInput.value = userDisplayName;
+                } else {
+                    nameSection.style.display = 'none';
+                }
+
                 modal.style.display = 'flex';
+                if (!hasConfirmedName && nameSection.style.display !== 'none') {
+                    setTimeout(() => nameInput.focus(), 100);
+                }
             }
         };
         moveAt(event.clientX, event.clientY);
-        if (!hasConfirmedName) {
-            showUsernamePrompt();
-        }
     };
     avgDot.onmousedown = (e) => startDrag(e, avgDot);
     userDot.onmousedown = (e) => startDrag(e, userDot);

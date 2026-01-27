@@ -98,6 +98,11 @@ onAuthStateChanged(auth, (user) => {
         }
         updateUsernameUI();
         initApp();
+
+        // Remove initial-load class after data has likely settled
+        setTimeout(() => {
+            document.body.classList.remove('initial-load');
+        }, 2000);
     } else {
         signInAnonymously(auth).catch(e => console.error("Anon Auth failed", e));
     }
@@ -954,6 +959,7 @@ function updateConnectionLine(itemId, x1, y1, x2, y2) {
 }
 
 function triggerSplash(container, x, y) {
+    if (Date.now() - window.appLaunchTime < 2000) return;
     const splash = document.createElement('div');
     splash.className = 'splash'; splash.style.left = x + '%'; splash.style.bottom = y + '%';
     container.appendChild(splash);
@@ -961,6 +967,7 @@ function triggerSplash(container, x, y) {
 }
 
 function triggerMegaSplash(container, x, y) {
+    if (Date.now() - window.appLaunchTime < 2000) return;
     const splash = document.createElement('div');
     splash.className = 'mega-splash'; splash.style.left = x + '%'; splash.style.bottom = y + '%';
     container.appendChild(splash);

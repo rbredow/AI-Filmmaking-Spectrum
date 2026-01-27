@@ -1,3 +1,10 @@
+body.initial-load *,
+body.initial-load *::before,
+body.initial-load *::after {
+    transition: none !important;
+    animation: none !important;
+}
+
 body {
     font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     background: #0a0a0a;

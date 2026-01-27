@@ -27,6 +27,7 @@ window.appLaunchTime = Date.now();
 let currentUser = null;
 let isAdmin = false;
 let isDragging = null;
+let isConfirmingVote = false; // Prevent interactions during confirmation
 let previousData = {};
 let itemsCache = {}; // Local cache of items for weighted calculations
 let svgLayer = null;
@@ -262,6 +263,7 @@ function initApp() {
     setupEditModalLogic();
     setupResetModalLogic();
     setupGlobalResetLogic();
+    setupVoteConfirmModal(); // Initialize the new confirm modal logic
 
     // Bind username click to modal
     const userDisplay = document.getElementById('user-display');
@@ -450,6 +452,25 @@ function setupGlobalResetLogic() {
     };
 }
 
+function setupVoteConfirmModal() {
+    const modal = document.getElementById('confirm-vote-modal');
+    const cancelBtn = document.getElementById('vote-cancel-btn');
+    const submitBtn = document.getElementById('vote-submit-btn');
+
+    cancelBtn.onclick = () => {
+        isConfirmingVote = false;
+        modal.style.display = 'none';
+        if (modal.dataset.itemId && currentUser) {
+            remove(ref(db, 'votes/' + modal.dataset.itemId + '/' + currentUser.uid));
+        }
+    };
+
+    submitBtn.onclick = () => {
+        isConfirmingVote = false;
+        modal.style.display = 'none';
+    };
+}
+
 
 function createItemElements(container, item) {
     const avgDot = document.createElement('div');
@@ -567,7 +588,7 @@ function removeItemElements(id) {
 
 function setupDrag(avgDot, userDot, item, container) {
     const updateFirebase = throttle((x, y) => {
-        if (!currentUser) return;
+        if (!currentUser || isConfirmingVote) return;
 
         if (viewMode === '1D') {
             let targetY = 50;
@@ -597,7 +618,7 @@ function setupDrag(avgDot, userDot, item, container) {
     }, 50);
 
     const startDrag = function (event, targetElement) {
-        if (!currentUser) return;
+        if (!currentUser || isConfirmingVote) return;
 
         // Block drag if clicking buttons (Admin) or inputs
         if (event.target.closest('button') || event.target.closest('input') || event.target.closest('.admin-btn')) return;
@@ -688,11 +709,28 @@ function setupDrag(avgDot, userDot, item, container) {
                     }
                     y = targetY;
                 }
+
                 set(ref(db, 'votes/' + item.id + '/' + currentUser.uid), {
                     x: Math.round(x * 10) / 10,
                     y: Math.round(y * 10) / 10,
                     username: userDisplayName
                 });
+
+                // --- SHOW CONFIRMATION MODAL ---
+                isConfirmingVote = true;
+                const modal = document.getElementById('confirm-vote-modal');
+                const title = document.getElementById('confirm-vote-title');
+                const stats = document.getElementById('confirm-vote-stats');
+
+                modal.dataset.itemId = item.id;
+                title.innerText = `Vote for ${item.name}`;
+                stats.innerHTML = `
+                    <div style="margin-top:10px;">
+                        <strong>Generative:</strong> ${Math.round(x)}%<br>
+                        <strong>Readiness:</strong> ${Math.round(y)}%
+                    </div>
+                `;
+                modal.style.display = 'flex';
             }
         };
         moveAt(event.clientX, event.clientY);

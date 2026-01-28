@@ -2,6 +2,8 @@
 
 A real-time, collaborative interactive graph for visualizing the "Utility vs. Readiness" of AI tools in filmmaking.
 
+You can (view the project online here)[https://rbredow.github.io/AI-Filmmaking-Spectrum/]
+
 ## Features
 
 ### 1. Interactive Graph

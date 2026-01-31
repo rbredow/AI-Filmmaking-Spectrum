@@ -40,6 +40,8 @@ const googleProvider = new GoogleAuthProvider();
 window.appLaunchTime = Date.now();
 let currentUser = null;
 let isAdmin = false;
+let votingEnabled = true;
+let addingEnabled = true;
 let isDragging = null;
 let isConfirmingVote = false; // Prevent interactions during confirmation
 let previousData = {};
@@ -240,6 +242,16 @@ const initialItems = [
         desc: "One button to make a film. Pure fantasy right now.",
     },
 ];
+
+function showToast(message) {
+    const container = document.getElementById("toast-container");
+    if (!container) return;
+    const toast = document.createElement("div");
+    toast.className = "toast";
+    toast.innerText = message;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
 
 function throttle(func, limit) {
     let inThrottle;
@@ -482,6 +494,35 @@ function initApp() {
         const data = snapshot.val() || {};
         updateGraphFromData(data, container);
     });
+
+    const settingsRef = ref(db, "settings");
+    onValue(settingsRef, (snapshot) => {
+        const settings = snapshot.val() || {
+            votingEnabled: true,
+            addingEnabled: true,
+        };
+        votingEnabled = settings.votingEnabled;
+        addingEnabled = settings.addingEnabled;
+
+        const toggleVoting = document.getElementById("toggle-voting");
+        const toggleAdding = document.getElementById("toggle-adding");
+        if (toggleVoting) toggleVoting.checked = votingEnabled;
+        if (toggleAdding) toggleAdding.checked = addingEnabled;
+
+        // Visual feedback for disabled buttons
+        const addBtn = document.getElementById("add-item-btn");
+        if (addBtn) {
+            if (!addingEnabled) {
+                addBtn.style.opacity = "0.3";
+                addBtn.style.cursor = "not-allowed";
+                addBtn.title = "Adding tools is currently closed";
+            } else {
+                addBtn.style.opacity = "1";
+                addBtn.style.cursor = "pointer";
+                addBtn.title = "Add New Tool";
+            }
+        }
+    });
 }
 
 // --- GLOBAL TOUCH/CLICK HANDLERS ---
@@ -539,6 +580,10 @@ function setupModalLogic() {
 
     if (addBtn)
         addBtn.onclick = () => {
+            if (!addingEnabled && !isAdmin) {
+                showToast("Adding Closed");
+                return;
+            }
             modal.style.display = "flex";
             document.getElementById("new-item-name").focus();
         };
@@ -553,6 +598,11 @@ function setupModalLogic() {
         const x = parseInt(sliderX.value);
         const y = parseInt(sliderY.value);
         if (!name) return alert("Please enter a name.");
+        if (!addingEnabled && !isAdmin) {
+            showToast("Adding Closed");
+            modal.style.display = "none";
+            return;
+        }
         const newId = "user_item_" + Date.now();
         const newItem = {
             id: newId,
@@ -633,6 +683,20 @@ function setupGlobalResetLogic() {
 
     if (btnOpen) btnOpen.onclick = () => (modal.style.display = "flex");
     if (btnCancel) btnCancel.onclick = () => (modal.style.display = "none");
+
+    const toggleVoting = document.getElementById("toggle-voting");
+    const toggleAdding = document.getElementById("toggle-adding");
+
+    if (toggleVoting) {
+        toggleVoting.onchange = () => {
+            update(ref(db, "settings"), { votingEnabled: toggleVoting.checked });
+        };
+    }
+    if (toggleAdding) {
+        toggleAdding.onchange = () => {
+            update(ref(db, "settings"), { addingEnabled: toggleAdding.checked });
+        };
+    }
 
     // 1. FACTORY RESET (Nuke)
     btnNuke.onclick = () => {
@@ -956,6 +1020,11 @@ function setupDrag(avgDot, userDot, item, container) {
             ) {
                 return;
             }
+        }
+
+        if (!votingEnabled && !isAdmin) {
+            showToast("Voting Closed");
+            return;
         }
 
         if (originalEvent && originalEvent.preventDefault) {

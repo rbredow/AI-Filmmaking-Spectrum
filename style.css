@@ -13,7 +13,8 @@ body {
     flex-direction: column;
     align-items: center;
     min-height: 100vh;
-    min-height: 100dvh; /* Dynamic viewport height for mobile */
+    min-height: 100dvh;
+    /* Dynamic viewport height for mobile */
     margin: 0;
     padding: 40px 20px;
     box-sizing: border-box;
@@ -837,12 +838,15 @@ button:active {
 
 /* Mobile - NO SCROLL LAYOUT */
 @media (max-width: 600px) {
+
     html,
     body {
-        overflow: hidden !important; /* Prevent all scrolling */
+        overflow: hidden !important;
+        /* Prevent all scrolling */
         height: 100%;
         height: 100dvh;
-        position: fixed; /* Prevent iOS bounce scroll */
+        position: fixed;
+        /* Prevent iOS bounce scroll */
         width: 100%;
     }
 
@@ -873,7 +877,8 @@ button:active {
     }
 
     #header p {
-        display: none; /* Hide subtitle on mobile */
+        display: none;
+        /* Hide subtitle on mobile */
     }
 
     #user-display {
@@ -887,9 +892,12 @@ button:active {
 
     #graph-container {
         width: 100%;
-        height: calc(100dvh - 45px); /* Full height minus header */
-        height: calc(100vh - 45px); /* Fallback */
-        min-height: 0; /* Remove min-height constraint */
+        height: calc(100dvh - 45px);
+        /* Full height minus header */
+        height: calc(100vh - 45px);
+        /* Fallback */
+        min-height: 0;
+        /* Remove min-height constraint */
         margin: 0;
         border: none;
         border-radius: 0;
@@ -955,7 +963,8 @@ button:active {
     }
 
     .y-label-top {
-        top: 50px; /* Below controls */
+        top: 50px;
+        /* Below controls */
         left: 8px;
     }
 
@@ -1161,7 +1170,8 @@ button:active {
     }
 
     #search-container {
-        display: none; /* Hide search on very small screens */
+        display: none;
+        /* Hide search on very small screens */
     }
 
     #view-mode-btn {
@@ -1187,6 +1197,7 @@ button:active {
 
 /* Landscape mobile - also no scroll */
 @media (max-height: 500px) and (orientation: landscape) {
+
     html,
     body {
         overflow: hidden !important;
@@ -1250,6 +1261,7 @@ button:active {
 /* ========================================= */
 
 @media (hover: none) and (pointer: coarse) {
+
     /* Remove hover states that don't work on touch */
     .dot:hover {
         transform: translate(-50%, 50%);
@@ -1337,6 +1349,7 @@ button:active {
 /* ========================================= */
 
 @media (prefers-reduced-motion: reduce) {
+
     .dot,
     .user-dot,
     .voter-dot,
@@ -1360,6 +1373,7 @@ button:active {
 /* ========================================= */
 
 @media print {
+
     html,
     body {
         overflow: visible !important;
@@ -1394,5 +1408,113 @@ button:active {
     .dot-label {
         color: #333;
         text-shadow: none;
+    }
+}
+
+/* --- ADMIN SWITCH --- */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #333;
+    transition: .4s;
+    border: 1px solid #444;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: #666;
+    transition: .4s;
+}
+
+input:checked+.slider {
+    background-color: #059669;
+}
+
+input:focus+.slider {
+    box-shadow: 0 0 1px #059669;
+}
+
+input:checked+.slider:before {
+    transform: translateX(20px);
+    background-color: #fff;
+}
+
+.slider.round {
+    border-radius: 24px;
+}
+
+.slider.round:before {
+    border-radius: 50%;
+}
+
+/* --- TOAST NOTIFICATION --- */
+#toast-container {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.toast {
+    background: rgba(20, 20, 20, 0.9);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 30px;
+    font-size: 14px;
+    border: 1px solid #444;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    animation: toast-in-out 3s forwards;
+    white-space: nowrap;
+}
+
+@keyframes toast-in-out {
+    0% {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    10% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+
+    90% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(-20px);
+        opacity: 0;
     }
 }

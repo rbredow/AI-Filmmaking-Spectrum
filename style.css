@@ -81,7 +81,6 @@ p {
     background: linear-gradient(to bottom, #111 0%, #050505 100%);
     margin-bottom: 40px;
     transition: background 3s;
-    touch-action: none;
 }
 
 /* Y-Axis Indicator */
@@ -392,6 +391,7 @@ p {
     background-color: #fff;
     -webkit-user-select: none;
     user-select: none;
+    touch-action: none;
 }
 
 /* Invisible touch target expansion */
@@ -448,6 +448,7 @@ p {
     transition: bottom 3s ease-in-out;
     -webkit-user-select: none;
     user-select: none;
+    touch-action: none;
 }
 
 /* Invisible touch target expansion */

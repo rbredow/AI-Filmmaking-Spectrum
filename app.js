@@ -1559,3 +1559,18 @@ window.editItem = (id) => {
     document.getElementById("edit-item-desc").value = desc;
     modal.style.display = "flex";
 };
+
+// --- DISCLAIMER MODAL LOGIC ---
+const disclaimerModal = document.getElementById("disclaimer-modal");
+if (disclaimerModal && !localStorage.getItem("disclaimer_seen")) {
+    disclaimerModal.style.display = "flex";
+    const dismissDisclaimer = () => {
+        disclaimerModal.style.display = "none";
+        localStorage.setItem("disclaimer_seen", "true");
+    };
+    const btn = document.getElementById("disclaimer-btn");
+    if (btn) btn.onclick = dismissDisclaimer;
+    disclaimerModal.onclick = (e) => {
+        if (e.target === disclaimerModal) dismissDisclaimer();
+    };
+}

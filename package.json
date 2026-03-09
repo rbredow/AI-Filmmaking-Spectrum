@@ -1,0 +1,17 @@
+{
+  "name": "ai-filmmaking-spectrum",
+  "version": "1.0.0",
+  "description": "Interactive spectrum for AI filmmaking tools.",
+  "main": "app.js",
+  "scripts": {
+    "dev": "npx http-server -p 8000"
+  },
+  "keywords": [
+    "ai",
+    "filmmaking",
+    "spectrum",
+    "firebase"
+  ],
+  "author": "Rob Bredow",
+  "license": "ISC"
+}

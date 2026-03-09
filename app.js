@@ -398,12 +398,43 @@ function initApp() {
             <input type="text" id="search-input" placeholder="Search...">
         </div>
         <div id="view-mode-btn" title="Toggle 1D/2D View">2D</div>
+        <div id="mode-hint" class="mode-hint">Tap for 2D View</div>
     `;
     renderedItems.clear();
+
+    const clearHint = () => {
+        if (window.onboardingTimer) clearTimeout(window.onboardingTimer);
+        if (window.onboardingHideTimer) clearTimeout(window.onboardingHideTimer);
+        const btn = document.getElementById("view-mode-btn");
+        const hint = document.getElementById("mode-hint");
+        if (btn) btn.classList.remove("hint-glow");
+        if (hint) hint.classList.remove("visible");
+    };
+
+    window.startOnboardingTimer = () => {
+        if (window.onboardingTimer || window.onboardingHideTimer) return;
+        if (viewMode !== "1D") return;
+
+        // Show hint after 5 seconds if still in 1D
+        window.onboardingTimer = setTimeout(() => {
+            const btn = document.getElementById("view-mode-btn");
+            const hint = document.getElementById("mode-hint");
+            if (btn && hint && viewMode === "1D") {
+                btn.classList.add("hint-glow");
+                hint.classList.add("visible");
+
+                // Keep visible for 10 seconds then hide
+                window.onboardingHideTimer = setTimeout(() => {
+                    clearHint();
+                }, 10000);
+            }
+        }, 5000);
+    };
 
     // Re-bind Toggle (since we wiped innerHTML)
     document.getElementById("view-mode-btn").onclick = () => {
         const btn = document.getElementById("view-mode-btn");
+        clearHint();
         if (viewMode === "2D") {
             viewMode = "1D";
             btn.innerText = "1D";
@@ -416,6 +447,11 @@ function initApp() {
     };
 
     if (viewMode === "1D") container.classList.add("mode-1d");
+
+    // Start onboarding timer if disclaimer was already dismissed
+    if (localStorage.getItem("disclaimer_seen")) {
+        window.startOnboardingTimer();
+    }
 
     // Setup Search Logic
     const searchInput = document.getElementById("search-input");
@@ -529,6 +565,15 @@ function initApp() {
 function setupGlobalTouchHandlers() {
     // Close tooltips when clicking/tapping outside dots
     document.addEventListener("click", (e) => {
+        // If hint is visible, clicking anywhere dismisses it
+        const hint = document.getElementById("mode-hint");
+        const btn = document.getElementById("view-mode-btn");
+        if (hint && hint.classList.contains("visible")) {
+            if (window.onboardingHideTimer) clearTimeout(window.onboardingHideTimer);
+            hint.classList.remove("visible");
+            if (btn) btn.classList.remove("hint-glow");
+        }
+
         if (!e.target.closest(".dot") && !e.target.closest(".tooltip")) {
             closeAllTooltips();
         }
@@ -1567,10 +1612,14 @@ if (disclaimerModal && !localStorage.getItem("disclaimer_seen")) {
     const dismissDisclaimer = () => {
         disclaimerModal.style.display = "none";
         localStorage.setItem("disclaimer_seen", "true");
+        if (window.startOnboardingTimer) window.startOnboardingTimer();
     };
     const btn = document.getElementById("disclaimer-btn");
     if (btn) btn.onclick = dismissDisclaimer;
     disclaimerModal.onclick = (e) => {
         if (e.target === disclaimerModal) dismissDisclaimer();
     };
+} else {
+    // Already seen, start timer
+    if (window.startOnboardingTimer) window.startOnboardingTimer();
 }

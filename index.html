@@ -17,7 +17,7 @@
     <!-- Prevent phone number detection -->
     <meta name="format-detection" content="telephone=no" />
 
-    <link rel="stylesheet" href="style.css?v=2.4" />
+    <link rel="stylesheet" href="style.css?v=2.7" />
 </head>
 
 <body class="initial-load">
@@ -46,16 +46,16 @@
         <div class="axis-label y-label-top">Ready</div>
         <div class="axis-label y-label-bottom">Not Ready</div>
         <div id="top-right-controls">
-            <div id="branch-filter-container">
-                <div id="branch-filter-btn" title="Filter by Branch">Branch ▾</div>
-                <div id="branch-filter-dropdown" style="display: none;"></div>
-            </div>
             <div id="search-container">
                 <span id="search-icon">🔍</span>
                 <input type="text" id="search-input" placeholder="Search..." />
             </div>
-            <div id="add-item-btn" title="Add New Tool">+ New Tool</div>
+            <div id="branch-filter-container">
+                <div id="branch-filter-btn" title="Filter by Branch">Branch ▾</div>
+                <div id="branch-filter-dropdown" style="display: none;"></div>
+            </div>
             <div id="view-mode-btn" title="Toggle 1D/2D View">2D</div>
+            <div id="add-item-btn" title="Add New Tool">+ New Tool</div>
         </div>
     </div>
 
@@ -184,7 +184,7 @@
     <!-- GLOBAL RESET MODAL -->
     <div id="global-reset-modal" class="modal-overlay" style="display: none">
         <div class="modal-content" style="text-align: center; width: 360px">
-            <h3>Master Reset</h3>
+            <h3>Admin Controls</h3>
             <p style="margin-bottom: 20px; color: #aaa; font-size: 13px">
                 Manage the entire database state.
             </p>
@@ -244,7 +244,7 @@
             </div>
 
             <div style="margin-top: 20px">
-                <button id="global-cancel-btn">Cancel</button>
+                <button id="global-cancel-btn">Close</button>
             </div>
         </div>
     </div>
@@ -323,7 +323,7 @@
                 }
             }
         </script>
-    <script type="module" src="app.js?v=2.3"></script>
+    <script type="module" src="app.js?v=2.5"></script>
 </body>
 
 </html>

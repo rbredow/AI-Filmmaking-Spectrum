@@ -133,11 +133,26 @@ p {
     text-align: right;
 }
 
-/* Add Button */
-#add-item-btn {
+/* Top Right Controls Group */
+#top-right-controls {
     position: absolute;
     top: -34px;
-    right: 95px;
+    right: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 1000;
+    pointer-events: none; /* Don't block clicks on graph behind this row */
+}
+
+/* Re-enable pointer events for all direct children */
+#top-right-controls > * {
+    pointer-events: auto;
+}
+
+/* Add Button */
+#add-item-btn {
+    position: relative;
     background: #3b82f6;
     color: #fff;
     font-size: 13px;
@@ -169,10 +184,8 @@ p {
 
 /* Branch Filter */
 #branch-filter-container {
-    position: absolute;
-    top: -34px;
-    right: 410px; /* Positioned left of search, giving room for expansion */
-    z-index: 1000;
+    position: relative;
+    z-index: 1001; /* Above other filter items if needed */
 }
 
 #branch-filter-btn {
@@ -233,9 +246,7 @@ p {
 
 /* View Mode Button */
 #view-mode-btn {
-    position: absolute;
-    top: -34px;
-    right: 40px;
+    position: relative;
     color: #888;
     font-size: 13px;
     font-weight: 700;
@@ -344,9 +355,7 @@ p {
 
 /* --- SEARCH BAR --- */
 #search-container {
-    position: absolute;
-    top: -34px;
-    right: 205px; /* Placed left of Add Tool btn */
+    position: relative;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -717,7 +726,7 @@ p {
     color: #ddd;
     font-size: 13px;
     line-height: 1.5;
-    pointer-events: auto;
+    pointer-events: none; /* Hidden tooltips must NOT intercept mouse/drag events */
     box-shadow: 0 10px 30px rgba(0, 0, 0, 1);
     transition:
         opacity 0.2s,
@@ -734,6 +743,7 @@ p {
     left: 0;
     width: 100%;
     background: transparent;
+    pointer-events: none; /* Must not block graph interaction below */
 }
 
 .tooltip strong {
@@ -748,12 +758,14 @@ p {
 .dot.force-tooltip .tooltip {
     visibility: visible;
     opacity: 1;
+    pointer-events: auto; /* Allow clicking Edit/Delete buttons when visible */
 }
 
 /* TOOLTIP TRIGGER - Mobile tap */
 .dot.tooltip-active .tooltip {
     visibility: visible;
     opacity: 1;
+    pointer-events: auto;
 }
 
 /* ADMIN TOOLTIP CONTROLS */

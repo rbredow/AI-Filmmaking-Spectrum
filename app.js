@@ -445,16 +445,16 @@ function initApp() {
         <div class="axis-label y-label-top">Ready</div>
         <div class="axis-label y-label-bottom">Not Ready</div>
         <div id="top-right-controls">
-            <div id="branch-filter-container">
-                <div id="branch-filter-btn" title="Filter by Branch">Branch ▾</div>
-                <div id="branch-filter-dropdown" style="display: none;"></div>
-            </div>
             <div id="search-container">
                 <span id="search-icon">🔍</span>
                 <input type="text" id="search-input" placeholder="Search...">
             </div>
-            <div id="add-item-btn" title="Add New Tool">+ New Tool</div>
+            <div id="branch-filter-container">
+                <div id="branch-filter-btn" title="Filter by Branch">Branch ▾</div>
+                <div id="branch-filter-dropdown" style="display: none;"></div>
+            </div>
             <div id="view-mode-btn" title="Toggle 1D/2D View">2D</div>
+            <div id="add-item-btn" title="Add New Tool">+ New Tool</div>
         </div>
     `;
     renderedItems.clear();
@@ -1200,13 +1200,12 @@ function setupDrag(avgDot, userDot, item, container) {
     const startDrag = function (clientX, clientY, targetElement, originalEvent) {
         if (!currentUser || isConfirmingVote) return;
 
-        // Block drag if clicking buttons (Admin) or inputs
+        // Block drag if clicking interactive controls inside tooltip
         if (originalEvent && originalEvent.target) {
             if (
-                originalEvent.target.closest("button") ||
-                originalEvent.target.closest("input") ||
                 originalEvent.target.closest(".admin-btn") ||
-                originalEvent.target.closest(".tooltip")
+                originalEvent.target.closest("button") ||
+                originalEvent.target.closest("input")
             ) {
                 return;
             }

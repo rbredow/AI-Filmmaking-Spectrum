@@ -48,7 +48,7 @@ let previousData = {};
 let itemsCache = {}; // Local cache of items for weighted calculations
 let svgLayer = null;
 let renderedItems = new Set();
-let viewMode = "1D";
+let viewMode = "2D"; // Default to 2D View
 const ADMIN_EMAIL = "rob.bredow@gmail.com";
 let userDisplayName = "";
 let hasConfirmedName = false;
@@ -456,43 +456,12 @@ function initApp() {
             <div id="add-item-btn" title="Add New Tool">+ New Tool</div>
             <div id="view-mode-btn" title="Toggle 1D/2D View">2D</div>
         </div>
-        <div id="mode-hint" class="mode-hint">Tap for 2D View</div>
     `;
     renderedItems.clear();
-
-    const clearHint = () => {
-        if (window.onboardingTimer) clearTimeout(window.onboardingTimer);
-        if (window.onboardingHideTimer) clearTimeout(window.onboardingHideTimer);
-        const btn = document.getElementById("view-mode-btn");
-        const hint = document.getElementById("mode-hint");
-        if (btn) btn.classList.remove("hint-glow");
-        if (hint) hint.classList.remove("visible");
-    };
-
-    window.startOnboardingTimer = () => {
-        if (window.onboardingTimer || window.onboardingHideTimer) return;
-        if (viewMode !== "1D") return;
-
-        // Show hint after 5 seconds if still in 1D
-        window.onboardingTimer = setTimeout(() => {
-            const btn = document.getElementById("view-mode-btn");
-            const hint = document.getElementById("mode-hint");
-            if (btn && hint && viewMode === "1D") {
-                btn.classList.add("hint-glow");
-                hint.classList.add("visible");
-
-                // Keep visible for 10 seconds then hide
-                window.onboardingHideTimer = setTimeout(() => {
-                    clearHint();
-                }, 10000);
-            }
-        }, 5000);
-    };
 
     // Re-bind Toggle (since we wiped innerHTML)
     document.getElementById("view-mode-btn").onclick = () => {
         const btn = document.getElementById("view-mode-btn");
-        clearHint();
         if (viewMode === "2D") {
             viewMode = "1D";
             btn.innerText = "1D";
@@ -504,12 +473,6 @@ function initApp() {
         }
     };
 
-    if (viewMode === "1D") container.classList.add("mode-1d");
-
-    // Start onboarding timer if disclaimer was already dismissed
-    if (localStorage.getItem("disclaimer_seen")) {
-        window.startOnboardingTimer();
-    }
 
     // Setup Branch Filter Logic
     const branchBtn = document.getElementById("branch-filter-btn");
@@ -1808,7 +1771,6 @@ if (disclaimerModal && !localStorage.getItem("disclaimer_seen")) {
     const dismissDisclaimer = () => {
         disclaimerModal.style.display = "none";
         localStorage.setItem("disclaimer_seen", "true");
-        if (window.startOnboardingTimer) window.startOnboardingTimer();
     };
     const btn = document.getElementById("disclaimer-btn");
     if (btn) btn.onclick = dismissDisclaimer;
@@ -1816,6 +1778,5 @@ if (disclaimerModal && !localStorage.getItem("disclaimer_seen")) {
         if (e.target === disclaimerModal) dismissDisclaimer();
     };
 } else {
-    // Already seen, start timer
-    if (window.startOnboardingTimer) window.startOnboardingTimer();
+    // Already seen
 }

@@ -599,6 +599,8 @@ function initApp() {
                 }
             });
         }
+        // After items are created/updated, schedule label de-overlap
+        scheduleResolveLabels();
     });
 
     const votesRef = ref(db, "votes");
@@ -1639,6 +1641,9 @@ function updateGraphFromData(allVotes, container) {
         }
     });
     previousData = JSON.parse(JSON.stringify(allVotes));
+
+    // After all dots have moved, schedule label de-overlap pass
+    scheduleResolveLabels();
 }
 
 function updateConnectionLine(itemId, x1, y1, x2, y2) {
@@ -1686,44 +1691,130 @@ function updateLabelPosition(labelElement, y) {
     labelElement.classList.remove("label-below", "label-above");
     if (y > 65) labelElement.classList.add("label-below");
     else labelElement.classList.add("label-above");
+    // Will be repositioned by resolveAllLabelOverlaps
+    labelElement.style.transform = "";
+}
 
-    // CONFLICT RESOLUTION: Stagger labels if they are too close in Y
-    const currentId = labelElement.id.replace("label-", "");
-    let offset = 0;
+// --- LABEL OVERLAP RESOLUTION ---
+let _labelResolveTimer = null;
+function scheduleResolveLabels() {
+    if (_labelResolveTimer) clearTimeout(_labelResolveTimer);
+    _labelResolveTimer = setTimeout(resolveAllLabelOverlaps, 250);
+}
 
-    renderedItems.forEach((otherId) => {
-        if (currentId === otherId) return;
-        const otherLabel = document.getElementById(`label-${otherId}`);
-        if (!otherLabel) return;
-        
-        const otherDot = document.getElementById(`dot-${otherId}`);
-        const thisDot = document.getElementById(`dot-${currentId}`);
-        if (!otherDot || !thisDot) return;
-        
-        const thisX = parseFloat(thisDot.style.left);
-        const thisY = parseFloat(thisDot.style.bottom);
-        const otherX = parseFloat(otherDot.style.left);
-        const otherY = parseFloat(otherDot.style.bottom);
+// All labels are 45° down-right — only the distance from the dot varies.
+// Generate slots at increasing distances.
+const LABEL_SLOTS = [];
+for (let i = 0; i < 12; i++) {
+    const offset = 12 + i * 14; // 12px, 26px, 40px, 54px, ...
+    LABEL_SLOTS.push({
+        css: `rotate(45deg) translate(${offset}px, 0)`,
+        // Bounding box: at 45deg, both dx and dy equal offset * cos(45)
+        dx: offset * 0.707,
+        dy: offset * 0.707,
+    });
+}
 
-        // If dots are within 2% of each other in both axes
-        if (Math.abs(thisY - otherY) < 2.5 && Math.abs(thisX - otherX) < 8) {
-            // If this dot is slightly below the other, push it further down or up
-            if (thisY <= otherY) {
-                offset += 15; // Stagger by 15px
-            }
-        }
+function resolveAllLabelOverlaps() {
+    const container = document.getElementById("graph-container");
+    if (!container) return;
+    const cW = container.clientWidth;
+    const cH = container.clientHeight;
+
+    // 1. Collect dot positions and label dimensions
+    const items = [];
+    renderedItems.forEach((id) => {
+        const dot = document.getElementById(`dot-${id}`);
+        const label = document.getElementById(`label-${id}`);
+        if (!dot || !label) return;
+
+        const dotXPct = parseFloat(dot.style.left) || 0;
+        const dotYPct = parseFloat(dot.style.bottom) || 0;
+        const dotXPx = (dotXPct / 100) * cW;
+        const dotYPx = (1 - dotYPct / 100) * cH;
+
+        // Estimate label dimensions (projected from 45deg rotation)
+        const textLen = label.innerText.length;
+        const charW = 7.5;
+        const diag = textLen * charW;
+        const projW = diag * 0.707;
+        const projH = diag * 0.707;
+
+        items.push({ id, label, dotXPx, dotYPx, projW, projH });
     });
 
-    if (offset > 0) {
-        const isBelow = labelElement.classList.contains("label-below");
-        if (isBelow) {
-            labelElement.style.transform = `rotate(45deg) translate(${15 + offset}px, 0)`;
-        } else {
-            labelElement.style.transform = `translate(10px, ${-25 - offset}px) rotate(45deg)`;
+    // Sort top-left to bottom-right so earlier labels get priority
+    items.sort((a, b) => (a.dotYPx + a.dotXPx) - (b.dotYPx + b.dotXPx));
+
+    // 2. Greedy placement: for each label try slots until no overlap
+    const placed = []; // already placed label rects
+
+    for (const item of items) {
+        let bestSlotIdx = 0;
+        let bestRect = getSlotRect(item, LABEL_SLOTS[0], cW, cH);
+        let hasOverlap = placed.some(r => rectsOverlap(bestRect, r));
+
+        if (hasOverlap) {
+            for (let s = 1; s < LABEL_SLOTS.length; s++) {
+                const candidateRect = getSlotRect(item, LABEL_SLOTS[s], cW, cH);
+                if (!placed.some(r => rectsOverlap(candidateRect, r))) {
+                    bestSlotIdx = s;
+                    bestRect = candidateRect;
+                    hasOverlap = false;
+                    break;
+                }
+            }
         }
-    } else {
-        labelElement.style.transform = "";
+
+        // If still overlapping after all slots, pick the one with least overlap
+        if (hasOverlap) {
+            let minOvlp = Infinity;
+            for (let s = 0; s < LABEL_SLOTS.length; s++) {
+                const candidateRect = getSlotRect(item, LABEL_SLOTS[s], cW, cH);
+                let total = 0;
+                for (const r of placed) total += overlapArea(candidateRect, r);
+                if (total < minOvlp) {
+                    minOvlp = total;
+                    bestSlotIdx = s;
+                    bestRect = candidateRect;
+                }
+            }
+        }
+
+        placed.push(bestRect);
+        item.label.style.transform = LABEL_SLOTS[bestSlotIdx].css;
+        item.label.style.transformOrigin = "left center";
+        // All labels use label-below class for consistent down-right styling
+        item.label.classList.remove("label-below", "label-above");
+        item.label.classList.add("label-below");
     }
+}
+
+function getSlotRect(item, slot, containerW, containerH) {
+    let x = item.dotXPx + slot.dx;
+    let y = item.dotYPx + slot.dy;
+    const w = item.projW;
+    const h = Math.max(item.projH, 14);
+
+    // Clamp to container bounds
+    if (x + w > containerW) x = containerW - w - 2;
+    if (x < 0) x = 2;
+    if (y + h > containerH) y = containerH - h - 2;
+    if (y < 0) y = 2;
+
+    return { x, y, w, h };
+}
+
+function rectsOverlap(a, b) {
+    const pad = 3;
+    return !(a.x + a.w + pad < b.x || b.x + b.w + pad < a.x ||
+             a.y + a.h + pad < b.y || b.y + b.h + pad < a.y);
+}
+
+function overlapArea(a, b) {
+    const xOverlap = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
+    const yOverlap = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+    return xOverlap * yOverlap;
 }
 
 window.deleteItem = (id) => {

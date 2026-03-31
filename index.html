@@ -17,7 +17,7 @@
     <!-- Prevent phone number detection -->
     <meta name="format-detection" content="telephone=no" />
 
-    <link rel="stylesheet" href="style.css?v=1.1" />
+    <link rel="stylesheet" href="style.css?v=1.3" />
 </head>
 
 <body class="initial-load">
@@ -47,6 +47,10 @@
         <div class="axis-label y-label-bottom">Not Ready</div>
 
         <div id="add-item-btn" title="Add New Tool">+</div>
+        <div id="branch-filter-container">
+            <div id="branch-filter-btn" title="Filter by Branch">Branch ▾</div>
+            <div id="branch-filter-dropdown" style="display: none;"></div>
+        </div>
         <div id="search-container">
             <span id="search-icon">🔍</span>
             <input type="text" id="search-input" placeholder="Search..." />
@@ -78,6 +82,10 @@
                 <div class="slider-labels">
                     <span>Not Ready</span><span>Ready</span>
                 </div>
+            </div>
+            <div class="form-group">
+                <label>Branches</label>
+                <div id="new-item-branches" class="checkbox-scroll-list"></div>
             </div>
             <div class="modal-actions">
                 <button id="cancel-btn">Cancel</button>
@@ -127,6 +135,10 @@
             <div class="form-group">
                 <label>Description</label>
                 <input type="text" id="edit-item-desc" maxlength="80" />
+            </div>
+            <div class="form-group">
+                <label>Branches</label>
+                <div id="edit-item-branches" class="checkbox-scroll-list"></div>
             </div>
             <div class="modal-actions">
                 <button id="edit-cancel-btn">Cancel</button>
@@ -218,6 +230,16 @@
                 <div style="font-size: 10px; color: #666">
                     DELETES EVERYTHING. Restores original 19 tools.
                 </div>
+
+                <div style="height: 1px; background: #333; margin: 10px 0;"></div>
+
+                <button id="btn-migrate-tags" class="primary-btn" style="background: #4f46e5;">
+                    Apply Default Tags to Existing
+                </button>
+                <div style="font-size: 10px; color: #666">
+                    Adds branch tags to tools in the database if they are missing.
+                    Keeps all votes and custom tools.
+                </div>
             </div>
 
             <div style="margin-top: 20px">
@@ -239,7 +261,8 @@
             <div class="form-group">
                 <input type="text" id="username-input" placeholder="Enter username..." maxlength="20" />
             </div>
-            <div class="modal-actions">
+            <div class="modal-actions" style="justify-content: space-between; align-items: center;">
+                <span id="admin-login-trigger" style="color: #666; font-size: 11px; cursor: pointer;">admin login</span>
                 <button id="username-submit-btn" class="primary-btn">
                     Start Voting
                 </button>
@@ -299,7 +322,7 @@
                 }
             }
         </script>
-    <script type="module" src="app.js?v=1.1"></script>
+    <script type="module" src="app.js?v=1.3"></script>
 </body>
 
 </html>

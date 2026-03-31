@@ -148,7 +148,11 @@ p {
     transition:
         color 0.2s,
         transform 0.2s;
-    padding: 5px;
+    padding: 2px 5px;
+    height: 34px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
 }
 
 #add-item-btn:hover {
@@ -160,22 +164,88 @@ p {
     transform: scale(0.95);
 }
 
-/* View Mode Button */
-#view-mode-btn {
+/* Branch Filter */
+#branch-filter-container {
     position: absolute;
-    top: -30px;
-    right: 40px;
+    top: -34px;
+    right: 210px; /* Positioned left of search, 200 -> 210 */
+    z-index: 1000;
+}
+
+#branch-filter-btn {
     color: #888;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
     cursor: pointer;
-    line-height: 24px;
+    height: 34px;
+    line-height: 32px; /* Adjusted for border */
     user-select: none;
     -webkit-user-select: none;
     transition: color 0.2s;
     border: 1px solid #333;
-    padding: 0 8px;
+    padding: 0 10px;
     border-radius: 4px;
+    background: #111;
+    box-sizing: border-box;
+}
+
+#branch-filter-btn:hover, #branch-filter-btn.active {
+    color: #fff;
+    border-color: #666;
+    background: #222;
+}
+
+#branch-filter-dropdown {
+    position: absolute;
+    top: 30px;
+    right: 0;
+    background: #1a1a1a;
+    border: 1px solid #444;
+    border-radius: 6px;
+    width: 200px;
+    max-height: 300px;
+    overflow-y: auto;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 1);
+    padding: 10px;
+    display: none;
+}
+
+.branch-checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: #ccc;
+    cursor: pointer;
+}
+
+.branch-checkbox-item input {
+    cursor: pointer;
+}
+
+.branch-checkbox-item:hover {
+    color: #fff;
+}
+
+/* View Mode Button */
+#view-mode-btn {
+    position: absolute;
+    top: -34px;
+    right: 40px;
+    color: #888;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    height: 34px;
+    line-height: 32px;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: color 0.2s;
+    border: 1px solid #333;
+    padding: 0 10px;
+    border-radius: 4px;
+    box-sizing: border-box;
 }
 
 #view-mode-btn:hover {
@@ -268,16 +338,18 @@ p {
 /* --- SEARCH BAR --- */
 #search-container {
     position: absolute;
-    top: -32px;
+    top: -34px;
     right: 85px;
     display: flex;
     align-items: center;
     gap: 8px;
     background: #111;
     border: 1px solid #333;
-    padding: 0 8px;
+    padding: 0 10px;
     border-radius: 4px;
     transition: all 0.3s;
+    height: 34px;
+    box-sizing: border-box;
 }
 
 #search-container:focus-within {
@@ -769,6 +841,15 @@ p {
     color: #fff;
     border-radius: 4px;
     font-size: 16px;
+}
+
+.checkbox-scroll-list {
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 10px;
+    background: #222;
 }
 
 .form-group input[type="range"] {

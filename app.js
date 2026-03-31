@@ -99,6 +99,34 @@ const ANIMALS = [
     "Octopus",
 ];
 
+const ACADEMY_BRANCHES = [
+    "Actors",
+    "Animation",
+    "Artist Representatives",
+    "Casting Directors",
+    "Cinematographers",
+    "Costume Designers",
+    "Directors",
+    "Documentary",
+    "Executives",
+    "Film Editors",
+    "Makeup Artists and Hairstylists",
+    "Marketing and Public Relations",
+    "Music",
+    "Producers",
+    "Production and Technology",
+    "Production Design",
+    "Short Films",
+    "Sound",
+    "Visual Effects",
+    "Writers",
+    "Members-at-Large",
+    "Associates"
+];
+
+let selectedTags = new Set();
+
+
 function generateDefaultUsername() {
     const color = COLORS[Math.floor(Math.random() * COLORS.length)];
     const animal = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
@@ -114,6 +142,7 @@ const initialItems = [
         x: 4,
         y: 98,
         desc: "Mathematical pixel cleanup. Standard in every render engine.",
+        tags: ["Visual Effects", "Production and Technology"]
     },
     {
         id: "d02",
@@ -121,6 +150,7 @@ const initialItems = [
         x: 10,
         y: 96,
         desc: "Scans text to tag props, cast, & scenes automatically.",
+        tags: ["Writers", "Directors", "Producers"]
     },
     {
         id: "d03",
@@ -128,6 +158,7 @@ const initialItems = [
         x: 16,
         y: 94,
         desc: "Topaz/Nvidia. Essential for remastering archival footage.",
+        tags: ["Visual Effects", "Film Editors"]
     },
     {
         id: "d04",
@@ -135,6 +166,7 @@ const initialItems = [
         x: 22,
         y: 92,
         desc: "Splitting vocals from music (stems). Industry standard.",
+        tags: ["Sound", "Music"]
     },
     {
         id: "d05",
@@ -142,6 +174,7 @@ const initialItems = [
         x: 28,
         y: 90,
         desc: "Magic Mask. Automating cutouts. 90% perfect, 10% manual fix.",
+        tags: ["Visual Effects", "Animation"]
     },
     {
         id: "d06",
@@ -149,6 +182,7 @@ const initialItems = [
         x: 34,
         y: 95,
         desc: "Speech-to-text. Integrated into Premiere/DaVinci.",
+        tags: ["Film Editors", "Sound"]
     },
     {
         id: "d07",
@@ -156,6 +190,7 @@ const initialItems = [
         x: 38,
         y: 85,
         desc: "Matching Camera A colors to Camera B automatically.",
+        tags: ["Cinematographers", "Visual Effects"]
     },
     {
         id: "d08",
@@ -163,6 +198,7 @@ const initialItems = [
         x: 44,
         y: 88,
         desc: "Edit video by deleting words in the transcript.",
+        tags: ["Film Editors", "Directors"]
     },
     {
         id: "d09",
@@ -170,6 +206,7 @@ const initialItems = [
         x: 48,
         y: 80,
         desc: "Move.ai/Wonder Studio. Video -> 3D Animation.",
+        tags: ["Animation", "Visual Effects", "Actors"]
     },
     {
         id: "d10",
@@ -177,6 +214,7 @@ const initialItems = [
         x: 54,
         y: 75,
         desc: "ElevenLabs. Tone is great, acting performance needs human guiding.",
+        tags: ["Sound", "Actors"]
     },
     {
         id: "d11",
@@ -184,6 +222,7 @@ const initialItems = [
         x: 60,
         y: 70,
         desc: "Scanning real locations into 3D space for Virtual Production.",
+        tags: ["Visual Effects", "Production Design", "Cinematographers"]
     },
     {
         id: "d12",
@@ -191,6 +230,7 @@ const initialItems = [
         x: 62,
         y: 60,
         desc: "Altering mouth movement. Can look 'uncanny' on closeups.",
+        tags: ["Sound", "Actors", "Visual Effects"]
     },
     {
         id: "d13",
@@ -198,6 +238,7 @@ const initialItems = [
         x: 68,
         y: 70,
         desc: "Removing objects. Great for still shots, struggles with motion.",
+        tags: ["Visual Effects"]
     },
     {
         id: "d14",
@@ -205,6 +246,7 @@ const initialItems = [
         x: 74,
         y: 85,
         desc: "Midjourney. High readiness for concepts, but Low utility for final pixel.",
+        tags: ["Directors", "Producers", "Production Design", "Writers", "Cinematographers"]
     },
     {
         id: "d15",
@@ -212,6 +254,7 @@ const initialItems = [
         x: 78,
         y: 55,
         desc: "Extending sets. Hard to maintain temporal consistency.",
+        tags: ["Visual Effects", "Production Design"]
     },
     {
         id: "d16",
@@ -219,6 +262,7 @@ const initialItems = [
         x: 82,
         y: 60,
         desc: "Generating foley or background music. Good for filler.",
+        tags: ["Sound"]
     },
     {
         id: "d17",
@@ -226,6 +270,7 @@ const initialItems = [
         x: 88,
         y: 40,
         desc: "Generating 3D props. Topology usually needs manual cleanup.",
+        tags: ["Animation", "Visual Effects", "Production Design"]
     },
     {
         id: "d18",
@@ -233,6 +278,7 @@ const initialItems = [
         x: 94,
         y: 25,
         desc: "Sora/Gen-3. Dream-like visuals. Physics/Continuity break.",
+        tags: ["Directors", "Visual Effects", "Animation"]
     },
     {
         id: "d19",
@@ -240,6 +286,7 @@ const initialItems = [
         x: 98,
         y: 5,
         desc: "One button to make a film. Pure fantasy right now.",
+        tags: ["Directors", "Producers", "Writers"]
     },
 ];
 
@@ -345,6 +392,19 @@ function showUsernamePrompt() {
         input.onkeydown = (e) => {
             if (e.key === "Enter") submitBtn.click();
         };
+
+        const adminTrigger = document.getElementById("admin-login-trigger");
+        if (adminTrigger) {
+            adminTrigger.onclick = () => {
+                signInWithPopup(auth, googleProvider).then(() => {
+                    modal.style.display = "none";
+                    showToast("Logged in as Admin");
+                }).catch((error) => {
+                    console.error(error);
+                    alert("Login Failed: " + error.message);
+                });
+            };
+        }
     } else {
         // Fallback if elements not found
         initApp();
@@ -354,15 +414,6 @@ function showUsernamePrompt() {
 function updateAdminUI() {
     const resetBtn = document.getElementById("global-reset-btn");
     if (resetBtn) resetBtn.style.display = isAdmin ? "block" : "none";
-}
-
-if (window.location.search.includes("admin=true")) {
-    const newUrl = window.location.origin + window.location.pathname;
-    window.history.replaceState({}, document.title, newUrl);
-    signInWithPopup(auth, googleProvider).catch((error) => {
-        console.error(error);
-        alert("Login Failed: " + error.message);
-    });
 }
 
 function initApp() {
@@ -393,6 +444,10 @@ function initApp() {
         <div class="axis-label y-label-top">Ready</div>
         <div class="axis-label y-label-bottom">Not Ready</div>
         <div id="add-item-btn" title="Add New Tool">+</div>
+        <div id="branch-filter-container">
+            <div id="branch-filter-btn" title="Filter by Branch">Branch ▾</div>
+            <div id="branch-filter-dropdown" style="display: none;"></div>
+        </div>
         <div id="search-container">
             <span id="search-icon">🔍</span>
             <input type="text" id="search-input" placeholder="Search...">
@@ -453,28 +508,83 @@ function initApp() {
         window.startOnboardingTimer();
     }
 
+    // Setup Branch Filter Logic
+    const branchBtn = document.getElementById("branch-filter-btn");
+    const branchDropdown = document.getElementById("branch-filter-dropdown");
+    if (branchBtn && branchDropdown) {
+        branchDropdown.innerHTML = ACADEMY_BRANCHES.map(branch => `
+            <label class="branch-checkbox-item">
+                <input type="checkbox" value="${branch}">
+                ${branch}
+            </label>
+        `).join('');
+
+        branchBtn.onclick = (e) => {
+            e.stopPropagation();
+            const isVisible = branchDropdown.style.display === "block";
+            branchDropdown.style.display = isVisible ? "none" : "block";
+        };
+
+        branchDropdown.onclick = (e) => e.stopPropagation();
+
+        branchDropdown.querySelectorAll("input[type=checkbox]").forEach(cb => {
+            cb.onchange = (e) => {
+                if (e.target.checked) selectedTags.add(e.target.value);
+                else selectedTags.delete(e.target.value);
+                applyFilters();
+            };
+        });
+        
+        document.addEventListener("click", () => {
+            branchDropdown.style.display = "none";
+        });
+    }
+
     // Setup Search Logic
     const searchInput = document.getElementById("search-input");
     if (searchInput) {
-        searchInput.oninput = (e) => {
-            const query = e.target.value.toLowerCase().trim();
-            const container = document.getElementById("graph-container");
-            if (query) {
-                container.classList.add("searching");
-                renderedItems.forEach((id) => {
-                    const dot = document.getElementById(`dot-${id}`);
-                    const label = document.getElementById(`label-${id}`);
-                    const isMatch =
-                        label && label.innerText.toLowerCase().includes(query);
-                    if (dot) {
-                        if (isMatch) dot.classList.add("search-match");
-                        else dot.classList.remove("search-match");
+        searchInput.oninput = () => applyFilters();
+    }
+
+    function applyFilters() {
+        const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
+        const container = document.getElementById("graph-container");
+        
+        let hasFilter = query !== "" || selectedTags.size > 0;
+
+        if (hasFilter) {
+            container.classList.add("searching");
+            renderedItems.forEach((id) => {
+                const dot = document.getElementById(`dot-${id}`);
+                const label = document.getElementById(`label-${id}`);
+                const item = itemsCache[id];
+                
+                let matchesSearch = true;
+                if (query) {
+                    matchesSearch = label && label.innerText.toLowerCase().includes(query);
+                }
+
+                let matchesTag = true;
+                if (selectedTags.size > 0) {
+                    if (!item || !item.tags || item.tags.length === 0) {
+                        matchesTag = false;
+                    } else {
+                        matchesTag = item.tags.some(tag => selectedTags.has(tag));
                     }
-                });
-            } else {
-                container.classList.remove("searching");
-            }
-        };
+                }
+
+                if (dot) {
+                    if (matchesSearch && matchesTag) dot.classList.add("search-match");
+                    else dot.classList.remove("search-match");
+                }
+            });
+        } else {
+            container.classList.remove("searching");
+            renderedItems.forEach((id) => {
+                const dot = document.getElementById(`dot-${id}`);
+                if (dot) dot.classList.remove("search-match");
+            });
+        }
     }
 
     svgLayer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -629,6 +739,17 @@ function setupModalLogic() {
                 showToast("Adding Closed");
                 return;
             }
+            
+            const branchList = document.getElementById("new-item-branches");
+            if (branchList) {
+                branchList.innerHTML = ACADEMY_BRANCHES.map(branch => `
+                    <label class="branch-checkbox-item">
+                        <input type="checkbox" value="${branch}">
+                        ${branch}
+                    </label>
+                `).join('');
+            }
+            
             modal.style.display = "flex";
             document.getElementById("new-item-name").focus();
         };
@@ -648,6 +769,10 @@ function setupModalLogic() {
             modal.style.display = "none";
             return;
         }
+        
+        const selectedBranchInputs = document.querySelectorAll('#new-item-branches input:checked');
+        const tags = Array.from(selectedBranchInputs).map(cb => cb.value);
+        
         const newId = "user_item_" + Date.now();
         const newItem = {
             id: newId,
@@ -656,6 +781,7 @@ function setupModalLogic() {
             x: x,
             y: y,
             createdBy: currentUser.uid,
+            tags: tags,
         };
         set(ref(db, "items/" + newId), newItem);
         set(ref(db, "votes/" + newId + "/" + currentUser.uid), {
@@ -678,8 +804,12 @@ function setupEditModalLogic() {
         const id = document.getElementById("edit-item-id").value;
         const name = document.getElementById("edit-item-name").value.trim();
         const desc = document.getElementById("edit-item-desc").value.trim();
+        
+        const selectedBranchInputs = document.querySelectorAll('#edit-item-branches input:checked');
+        const tags = Array.from(selectedBranchInputs).map(cb => cb.value);
+        
         if (id && name) {
-            update(ref(db, "items/" + id), { name, desc });
+            update(ref(db, "items/" + id), { name, desc, tags });
             modal.style.display = "none";
         }
     };
@@ -728,6 +858,26 @@ function setupGlobalResetLogic() {
 
     if (btnOpen) btnOpen.onclick = () => (modal.style.display = "flex");
     if (btnCancel) btnCancel.onclick = () => (modal.style.display = "none");
+
+    const btnMigrate = document.getElementById("btn-migrate-tags");
+    if (btnMigrate) {
+        btnMigrate.onclick = () => {
+            if (confirm("Apply default tags to all existing items? This won't delete any labels or votes, just adds missing branch tags.")) {
+                const updates = {};
+                Object.values(itemsCache).forEach(item => {
+                    const defaultItem = initialItems.find(i => i.name.toLowerCase() === item.name.toLowerCase());
+                    if (defaultItem && defaultItem.tags) {
+                        // Merge or set tags if they don't exist
+                        updates[`items/${item.id}/tags`] = defaultItem.tags;
+                    }
+                });
+                update(ref(db), updates).then(() => {
+                    showToast("Tags Migrated");
+                    modal.style.display = "none";
+                });
+            }
+        };
+    }
 
     const toggleVoting = document.getElementById("toggle-voting");
     const toggleAdding = document.getElementById("toggle-adding");
@@ -870,6 +1020,7 @@ function createItemElements(container, item) {
     // NEW TOOLTIP STRUCTURE
     let html = `
         <div style="margin-bottom:2px;"><strong>${item.name}</strong></div>
+        ${item.tags && item.tags.length > 0 ? `<div style="font-size:10px; color:#3b82f6; margin-bottom:4px; font-weight:600;">${item.tags.join(', ')}</div>` : ''}
         <div id="desc-${item.id}" style="font-size:11px; color:#aaa; line-height:1.2; margin-bottom:4px;">${item.desc}</div>
         <div style="font-size:10px; color:#888;">
             <span style="color:#eee;">Generative: <b id="val-x-${item.id}">${Math.round(item.x)}</b>%</span>
@@ -1599,9 +1750,23 @@ window.editItem = (id) => {
     const modal = document.getElementById("edit-item-modal");
     const name = document.getElementById(`label-${id}`).innerText;
     const desc = document.getElementById(`desc-${id}`).innerText;
+    const item = itemsCache[id];
+    
     document.getElementById("edit-item-id").value = id;
     document.getElementById("edit-item-name").value = name;
     document.getElementById("edit-item-desc").value = desc;
+    
+    const branchList = document.getElementById("edit-item-branches");
+    if (branchList) {
+        branchList.innerHTML = ACADEMY_BRANCHES.map(branch => {
+            const isChecked = item && item.tags && item.tags.includes(branch) ? "checked" : "";
+            return `<label class="branch-checkbox-item">
+                <input type="checkbox" value="${branch}" ${isChecked}>
+                ${branch}
+            </label>`;
+        }).join('');
+    }
+    
     modal.style.display = "flex";
 };
 

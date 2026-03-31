@@ -696,19 +696,22 @@ p {
     letter-spacing: 0.5px;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 1);
     z-index: -1;
-    transition: all 3s ease-in-out;
+    /* Transition position smoothly but NOT transform — overlap adjustment
+       should be instant so labels don't appear to drift from their dots */
+    transition: left 3s ease-in-out, bottom 3s ease-in-out, opacity 0.5s;
     left: 50%;
     top: 50%;
     transform-origin: left center;
+    transform: rotate(45deg) translate(10px, 0);
 }
 
 .label-below {
-    transform: rotate(45deg) translate(12px, 0);
+    /* default — JS will override with calculated offset */
 }
 
 /* label-above kept as no-op for backwards compat */
 .label-above {
-    transform: rotate(45deg) translate(12px, 0);
+    /* default — JS will override with calculated offset */
 }
 
 /* Tooltip */

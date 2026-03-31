@@ -1688,10 +1688,9 @@ function updateDotColor(dot, y) {
     else dot.classList.add("ready-low");
 }
 function updateLabelPosition(labelElement, y) {
+    // Initial class — will be refined by resolveAllLabelOverlaps
     labelElement.classList.remove("label-below", "label-above");
-    if (y > 65) labelElement.classList.add("label-below");
-    else labelElement.classList.add("label-above");
-    // Will be repositioned by resolveAllLabelOverlaps
+    labelElement.classList.add("label-below");
     labelElement.style.transform = "";
 }
 
@@ -1702,18 +1701,15 @@ function scheduleResolveLabels() {
     _labelResolveTimer = setTimeout(resolveAllLabelOverlaps, 250);
 }
 
-// All labels are 45° down-right — only the distance from the dot varies.
-// Generate slots at increasing distances.
-const LABEL_SLOTS = [];
-for (let i = 0; i < 12; i++) {
-    const offset = 12 + i * 14; // 12px, 26px, 40px, 54px, ...
-    LABEL_SLOTS.push({
-        css: `rotate(45deg) translate(${offset}px, 0)`,
-        // Bounding box: at 45deg, both dx and dy equal offset * cos(45)
-        dx: offset * 0.707,
-        dy: offset * 0.707,
-    });
-}
+// Perpendicular slide: labels stay close to the dot.
+// SMALL offsets only — prefer overlap over labels drifting far from dots.
+// Max offset ±21px = ~15px on screen. Offsets: 0, ±7, ±14, ±21
+const PERP_OFFSETS = [0, -7, 7, -14, 14, -21, 21];
+
+const COS45 = 0.707;
+const SIN45 = 0.707;
+const BASE_ALONG = 10; // fixed distance along the 45° axis
+const FONT_HEIGHT = 10; // perpendicular thickness of text at 45° (~13px font * cos45)
 
 function resolveAllLabelOverlaps() {
     const container = document.getElementById("graph-container");
@@ -1721,7 +1717,7 @@ function resolveAllLabelOverlaps() {
     const cW = container.clientWidth;
     const cH = container.clientHeight;
 
-    // 1. Collect dot positions and label dimensions
+    // 1. Collect all label data
     const items = [];
     renderedItems.forEach((id) => {
         const dot = document.getElementById(`dot-${id}`);
@@ -1733,88 +1729,114 @@ function resolveAllLabelOverlaps() {
         const dotXPx = (dotXPct / 100) * cW;
         const dotYPx = (1 - dotYPct / 100) * cH;
 
-        // Estimate label dimensions (projected from 45deg rotation)
-        const textLen = label.innerText.length;
-        const charW = 7.5;
-        const diag = textLen * charW;
-        const projW = diag * 0.707;
-        const projH = diag * 0.707;
+        // Reset any wrapping from previous version
+        label.style.whiteSpace = "nowrap";
+        label.style.maxWidth = "";
 
-        items.push({ id, label, dotXPx, dotYPx, projW, projH });
+        // Label dimensions in LOCAL (rotated) coordinate space:
+        // - along axis: textLen * charWidth (the length of the text string)
+        // - perpendicular: ~FONT_HEIGHT (the height of one text line)
+        const textLen = label.innerText.length;
+        const charW = 7;
+        const textWidth = textLen * charW; // length along the 45° axis
+
+        items.push({ id, label, dotXPx, dotYPx, textWidth });
     });
 
-    // Sort top-left to bottom-right so earlier labels get priority
+    // Sort top-left to bottom-right for consistent priority
     items.sort((a, b) => (a.dotYPx + a.dotXPx) - (b.dotYPx + b.dotXPx));
 
-    // 2. Greedy placement: for each label try slots until no overlap
-    const placed = []; // already placed label rects
+    // 2. Greedy placement using oriented bounding boxes
+    // Each placed label is stored as its rotated-axis projection:
+    //   { along0, along1, perp0, perp1 }
+    // where "along" is the 45° diagonal axis, "perp" is perpendicular to it.
+    const placed = [];
 
     for (const item of items) {
-        let bestSlotIdx = 0;
-        let bestRect = getSlotRect(item, LABEL_SLOTS[0], cW, cH);
-        let hasOverlap = placed.some(r => rectsOverlap(bestRect, r));
+        let bestOffset = 0;
+        let bestOBB = calcOBB(item, 0);
+        let hasOverlap = placed.some(r => obbOverlap(bestOBB, r));
 
         if (hasOverlap) {
-            for (let s = 1; s < LABEL_SLOTS.length; s++) {
-                const candidateRect = getSlotRect(item, LABEL_SLOTS[s], cW, cH);
-                if (!placed.some(r => rectsOverlap(candidateRect, r))) {
-                    bestSlotIdx = s;
-                    bestRect = candidateRect;
+            for (const perpY of PERP_OFFSETS) {
+                if (perpY === 0) continue;
+                const candidateOBB = calcOBB(item, perpY);
+                // Check screen bounds (use screen-space anchor)
+                const sx = item.dotXPx + (BASE_ALONG * COS45 - perpY * SIN45);
+                const sy = item.dotYPx + (BASE_ALONG * SIN45 + perpY * COS45);
+                if (sy < -10 || sy > cH + 10 || sx < -10 || sx > cW + 10) continue;
+
+                if (!placed.some(r => obbOverlap(candidateOBB, r))) {
+                    bestOffset = perpY;
+                    bestOBB = candidateOBB;
                     hasOverlap = false;
                     break;
                 }
             }
         }
 
-        // If still overlapping after all slots, pick the one with least overlap
+        // If still overlapping, pick smallest overlap
         if (hasOverlap) {
             let minOvlp = Infinity;
-            for (let s = 0; s < LABEL_SLOTS.length; s++) {
-                const candidateRect = getSlotRect(item, LABEL_SLOTS[s], cW, cH);
+            for (const perpY of PERP_OFFSETS) {
+                const candidateOBB = calcOBB(item, perpY);
+                const sx = item.dotXPx + (BASE_ALONG * COS45 - perpY * SIN45);
+                const sy = item.dotYPx + (BASE_ALONG * SIN45 + perpY * COS45);
+                if (sy < -10 || sy > cH + 10) continue;
                 let total = 0;
-                for (const r of placed) total += overlapArea(candidateRect, r);
+                for (const r of placed) total += obbOverlapAmount(candidateOBB, r);
                 if (total < minOvlp) {
                     minOvlp = total;
-                    bestSlotIdx = s;
-                    bestRect = candidateRect;
+                    bestOffset = perpY;
+                    bestOBB = candidateOBB;
                 }
             }
         }
 
-        placed.push(bestRect);
-        item.label.style.transform = LABEL_SLOTS[bestSlotIdx].css;
+        placed.push(bestOBB);
+
+        // Apply CSS transform
+        item.label.style.transform = `rotate(45deg) translate(${BASE_ALONG}px, ${bestOffset}px)`;
         item.label.style.transformOrigin = "left center";
-        // All labels use label-below class for consistent down-right styling
-        item.label.classList.remove("label-below", "label-above");
-        item.label.classList.add("label-below");
     }
 }
 
-function getSlotRect(item, slot, containerW, containerH) {
-    let x = item.dotXPx + slot.dx;
-    let y = item.dotYPx + slot.dy;
-    const w = item.projW;
-    const h = Math.max(item.projH, 14);
+// Calculate oriented bounding box projections onto the 45° axes.
+// "along" axis = direction text reads (45° from horizontal)
+// "perp" axis = perpendicular to text (90° from along)
+function calcOBB(item, perpY) {
+    // The dot position projected onto the rotated axes:
+    //   along = dotX * cos45 + dotY * sin45
+    //   perp  = -dotX * sin45 + dotY * cos45
+    const dotAlong = item.dotXPx * COS45 + item.dotYPx * SIN45;
+    const dotPerp = -item.dotXPx * SIN45 + item.dotYPx * COS45;
 
-    // Clamp to container bounds
-    if (x + w > containerW) x = containerW - w - 2;
-    if (x < 0) x = 2;
-    if (y + h > containerH) y = containerH - h - 2;
-    if (y < 0) y = 2;
-
-    return { x, y, w, h };
+    // The label starts at (BASE_ALONG, perpY) in local rotated coords
+    // In the rotated axis frame:
+    //   along start = dotAlong + BASE_ALONG
+    //   along end   = dotAlong + BASE_ALONG + textWidth
+    //   perp start  = dotPerp + perpY
+    //   perp end    = dotPerp + perpY + FONT_HEIGHT
+    return {
+        along0: dotAlong + BASE_ALONG,
+        along1: dotAlong + BASE_ALONG + item.textWidth,
+        perp0: dotPerp + perpY,
+        perp1: dotPerp + perpY + FONT_HEIGHT,
+    };
 }
 
-function rectsOverlap(a, b) {
-    const pad = 3;
-    return !(a.x + a.w + pad < b.x || b.x + b.w + pad < a.x ||
-             a.y + a.h + pad < b.y || b.y + b.h + pad < a.y);
+function obbOverlap(a, b) {
+    const pad = 1;
+    // Two OBBs overlap only if they overlap on BOTH axes
+    const alongOverlap = a.along0 < b.along1 + pad && b.along0 < a.along1 + pad;
+    const perpOverlap = a.perp0 < b.perp1 + pad && b.perp0 < a.perp1 + pad;
+    return alongOverlap && perpOverlap;
 }
 
-function overlapArea(a, b) {
-    const xOverlap = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
-    const yOverlap = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
-    return xOverlap * yOverlap;
+function obbOverlapAmount(a, b) {
+    const alongOvlp = Math.max(0, Math.min(a.along1, b.along1) - Math.max(a.along0, b.along0));
+    const perpOvlp = Math.max(0, Math.min(a.perp1, b.perp1) - Math.max(a.perp0, b.perp0));
+    return alongOvlp * perpOvlp;
 }
 
 window.deleteItem = (id) => {

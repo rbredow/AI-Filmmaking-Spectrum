@@ -136,39 +136,42 @@ p {
 /* Add Button */
 #add-item-btn {
     position: absolute;
-    top: -30px;
-    right: 0;
-    color: #888;
-    font-size: 24px;
+    top: -34px;
+    right: 95px;
+    background: #3b82f6;
+    color: #fff;
+    font-size: 13px;
     font-weight: 700;
     cursor: pointer;
-    line-height: 1;
+    height: 34px;
+    line-height: 32px;
     user-select: none;
     -webkit-user-select: none;
-    transition:
-        color 0.2s,
-        transform 0.2s;
-    padding: 2px 5px;
-    height: 34px;
+    transition: background 0.2s, transform 0.2s;
+    border: none;
+    padding: 0 16px;
+    border-radius: 4px;
     box-sizing: border-box;
     display: flex;
     align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
 }
 
 #add-item-btn:hover {
-    color: #fff;
-    transform: scale(1.1);
+    background: #2563eb;
+    transform: translateY(-1px);
 }
 
 #add-item-btn:active {
-    transform: scale(0.95);
+    transform: translateY(1px);
 }
 
 /* Branch Filter */
 #branch-filter-container {
     position: absolute;
     top: -34px;
-    right: 210px; /* Positioned left of search, 200 -> 210 */
+    right: 410px; /* Positioned left of search, giving room for expansion */
     z-index: 1000;
 }
 
@@ -343,7 +346,7 @@ p {
 #search-container {
     position: absolute;
     top: -34px;
-    right: 85px;
+    right: 205px; /* Placed left of Add Tool btn */
     display: flex;
     align-items: center;
     gap: 8px;
@@ -708,7 +711,7 @@ p {
     padding: 12px 16px;
     border-radius: 6px;
     width: 260px;
-    bottom: 24px;
+    bottom: 16px;
     left: 50%;
     transform: translateX(-50%);
     color: #ddd;
@@ -726,8 +729,8 @@ p {
 .tooltip::after {
     content: "";
     position: absolute;
-    bottom: -14px;
-    height: 14px;
+    bottom: -24px;
+    height: 24px;
     left: 0;
     width: 100%;
     background: transparent;

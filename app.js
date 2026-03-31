@@ -398,7 +398,8 @@ function showUsernamePrompt() {
             adminTrigger.onclick = () => {
                 signInWithPopup(auth, googleProvider).then(() => {
                     modal.style.display = "none";
-                    showToast("Logged in as Admin");
+                    showToast("Logged in successfully. Reloading...");
+                    setTimeout(() => window.location.reload(), 800);
                 }).catch((error) => {
                     console.error(error);
                     alert("Login Failed: " + error.message);
@@ -443,17 +444,18 @@ function initApp() {
         <div class="axis-label x-label-right">Generative / Creative →</div>
         <div class="axis-label y-label-top">Ready</div>
         <div class="axis-label y-label-bottom">Not Ready</div>
-        <div id="add-item-btn" title="Add New Tool">+</div>
-        <div id="branch-filter-container">
-            <div id="branch-filter-btn" title="Filter by Branch">Branch ▾</div>
-            <div id="branch-filter-dropdown" style="display: none;"></div>
+        <div id="top-right-controls">
+            <div id="branch-filter-container">
+                <div id="branch-filter-btn" title="Filter by Branch">Branch ▾</div>
+                <div id="branch-filter-dropdown" style="display: none;"></div>
+            </div>
+            <div id="search-container">
+                <span id="search-icon">🔍</span>
+                <input type="text" id="search-input" placeholder="Search...">
+            </div>
+            <div id="add-item-btn" title="Add New Tool">+ New Tool</div>
+            <div id="view-mode-btn" title="Toggle 1D/2D View">2D</div>
         </div>
-        <div id="search-container">
-            <span id="search-icon">🔍</span>
-            <input type="text" id="search-input" placeholder="Search...">
-        </div>
-        <div id="toggle-tags-btn" title="Toggle Branch Tags">Tags <span class="toggle-icon">○</span></div>
-        <div id="view-mode-btn" title="Toggle 1D/2D View">2D</div>
         <div id="mode-hint" class="mode-hint">Tap for 2D View</div>
     `;
     renderedItems.clear();
@@ -656,19 +658,20 @@ function initApp() {
         if (toggleVoting) toggleVoting.checked = votingEnabled;
         if (toggleAdding) toggleAdding.checked = addingEnabled;
 
-        // Visual feedback for disabled buttons
+        // Visual feedback for disabled
         const addBtn = document.getElementById("add-item-btn");
         if (addBtn) {
-            if (!addingEnabled) {
-                addBtn.style.opacity = "0.3";
-                addBtn.style.cursor = "not-allowed";
-                addBtn.title = "Adding tools is currently closed";
-            } else {
-                addBtn.style.opacity = "1";
-                addBtn.style.cursor = "pointer";
-                addBtn.title = "Add New Tool";
-            }
+            addBtn.style.opacity = addingEnabled ? "1" : "0.3";
+            addBtn.style.cursor = addingEnabled ? "pointer" : "not-allowed";
         }
+
+        // Update all existing tooltips' Edit button visibility
+        renderedItems.forEach(id => {
+            const editBtn = document.getElementById(`edit-btn-${id}`);
+            if (editBtn) {
+                editBtn.style.display = (addingEnabled || isAdmin) ? "block" : "none";
+            }
+        });
     });
 }
 
@@ -800,20 +803,35 @@ function setupEditModalLogic() {
     const modal = document.getElementById("edit-item-modal");
     const cancelBtn = document.getElementById("edit-cancel-btn");
     const submitBtn = document.getElementById("edit-submit-btn");
+
     if (cancelBtn) cancelBtn.onclick = () => (modal.style.display = "none");
-    submitBtn.onclick = () => {
-        const id = document.getElementById("edit-item-id").value;
-        const name = document.getElementById("edit-item-name").value.trim();
-        const desc = document.getElementById("edit-item-desc").value.trim();
-        
-        const selectedBranchInputs = document.querySelectorAll('#edit-item-branches input:checked');
-        const tags = Array.from(selectedBranchInputs).map(cb => cb.value);
-        
-        if (id && name) {
-            update(ref(db, "items/" + id), { name, desc, tags });
-            modal.style.display = "none";
-        }
-    };
+    if (submitBtn) {
+        submitBtn.onclick = () => {
+            const id = document.getElementById("edit-item-id").value;
+            const name = document.getElementById("edit-item-name").value.trim();
+            const desc = document.getElementById("edit-item-desc").value.trim();
+            
+            const selectedBranchInputs = document.querySelectorAll('#edit-item-branches input:checked');
+            const tags = Array.from(selectedBranchInputs).map(cb => cb.value);
+            
+            if (id && name) {
+                const payload = { name, desc };
+                if (tags.length > 0) {
+                    payload.tags = tags;
+                } else {
+                    payload.tags = null;
+                }
+                update(ref(db, "items/" + id), payload)
+                    .then(() => {
+                        modal.style.display = "none";
+                    })
+                    .catch((error) => {
+                        console.error("Save failed:", error);
+                        alert("Save failed: " + error.message);
+                    });
+            }
+        };
+    }
 }
 
 function setupResetModalLogic() {
@@ -1015,13 +1033,13 @@ function createItemElements(container, item) {
     const tooltip = document.createElement("div");
     tooltip.className = "tooltip";
     tooltip.id = `tooltip-${item.id}`;
-    if (isAdmin) tooltip.style.pointerEvents = "auto";
-    else tooltip.style.pointerEvents = "none";
 
     // NEW TOOLTIP STRUCTURE
     let html = `
         <div style="margin-bottom:2px;"><strong>${item.name}</strong></div>
-        ${item.tags && item.tags.length > 0 ? `<div style="font-size:10px; color:#3b82f6; margin-bottom:4px; font-weight:600;">${item.tags.join(', ')}</div>` : ''}
+        <div id="tags-${item.id}" style="font-size:10px; color:#3b82f6; margin-bottom:4px; font-weight:600;">
+            ${item.tags && item.tags.length > 0 ? item.tags.join(', ') : ''}
+        </div>
         <div id="desc-${item.id}" style="font-size:11px; color:#aaa; line-height:1.2; margin-bottom:4px;">${item.desc}</div>
         <div style="font-size:10px; color:#888;">
             <span style="color:#eee;">Generative: <b id="val-x-${item.id}">${Math.round(item.x)}</b>%</span>
@@ -1031,15 +1049,15 @@ function createItemElements(container, item) {
         </div>
     `;
 
+    html += `<div class="admin-controls">`;
+    const canEdit = addingEnabled || isAdmin;
+    html += `<div id="edit-btn-${item.id}" class="admin-btn" style="display: ${canEdit ? 'block' : 'none'}" onclick="window.editItem('${item.id}')">Edit</div>`;
     if (isAdmin) {
-        html += `
-            <div class="admin-controls">
-                <div class="admin-btn" onclick="window.editItem('${item.id}')">Edit</div>
-                <div class="admin-btn" onclick="window.resetVotes('${item.id}')">Reset Votes</div>
-                <div class="admin-btn delete" onclick="window.deleteItem('${item.id}')">Delete</div>
-            </div>
-        `;
+        html += `<div class="admin-btn" onclick="window.resetVotes('${item.id}')">Reset Votes</div>
+                 <div class="admin-btn delete" onclick="window.deleteItem('${item.id}')">Delete</div>`;
     }
+    html += `</div>`;
+
     tooltip.innerHTML = html;
 
     if (item.x > 80) {
@@ -1150,8 +1168,20 @@ function updateItemMetadata(item) {
     if (tooltip) {
         const titleStrong = tooltip.querySelector("strong");
         if (titleStrong) titleStrong.innerText = item.name;
+
+        const tagsSpan = document.getElementById(`tags-${item.id}`);
+        if (tagsSpan) {
+            tagsSpan.innerText = item.tags && item.tags.length > 0 ? item.tags.join(', ') : '';
+        }
+
         const descSpan = document.getElementById(`desc-${item.id}`);
         if (descSpan) descSpan.innerText = item.desc;
+        
+        // Also refresh Edit button visibility based on current items and settings
+        const editBtn = document.getElementById(`edit-btn-${item.id}`);
+        if (editBtn) {
+            editBtn.style.display = (addingEnabled || isAdmin) ? "block" : "none";
+        }
     }
 }
 

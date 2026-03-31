@@ -452,6 +452,7 @@ function initApp() {
             <span id="search-icon">🔍</span>
             <input type="text" id="search-input" placeholder="Search...">
         </div>
+        <div id="toggle-tags-btn" title="Toggle Branch Tags">Tags <span class="toggle-icon">○</span></div>
         <div id="view-mode-btn" title="Toggle 1D/2D View">2D</div>
         <div id="mode-hint" class="mode-hint">Tap for 2D View</div>
     `;
@@ -1702,11 +1703,11 @@ function updateLabelPosition(labelElement, y) {
         if (currentId === otherId) return;
         const otherLabel = document.getElementById(`label-${otherId}`);
         if (!otherLabel) return;
-
+        
         const otherDot = document.getElementById(`dot-${otherId}`);
         const thisDot = document.getElementById(`dot-${currentId}`);
         if (!otherDot || !thisDot) return;
-
+        
         const thisX = parseFloat(thisDot.style.left);
         const thisY = parseFloat(thisDot.style.bottom);
         const otherX = parseFloat(otherDot.style.left);

@@ -4,7 +4,8 @@
   "description": "Interactive spectrum for AI filmmaking tools.",
   "main": "app.js",
   "scripts": {
-    "dev": "npx http-server -p 8000 -c-1"
+    "dev": "npx http-server -p 8000 -c-1",
+    "snapshot": "node scripts/snapshot.mjs"
   },
   "keywords": [
     "ai",

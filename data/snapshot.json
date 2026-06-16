@@ -1,0 +1,913 @@
+{
+  "capturedAt": "2026-06-16T15:37:37.470Z",
+  "source": "ai-filmmaking-spectrum-default-rtdb.firebaseio.com",
+  "settings": {
+    "addingEnabled": false,
+    "votingEnabled": false
+  },
+  "items": {
+    "d01": {
+      "desc": "Mathematical pixel cleanup. Standard in every render engine.",
+      "id": "d01",
+      "name": "Denoising Picture",
+      "tags": [
+        "Cinematographers",
+        "Visual Effects"
+      ],
+      "x": 4.86061,
+      "y": 93.3909
+    },
+    "d02": {
+      "desc": "Scans text to tag props, cast, & scenes automatically.",
+      "id": "d02",
+      "name": "Script Breakdown",
+      "tags": [
+        "Directors",
+        "Executives",
+        "Film Editors",
+        "Producers",
+        "Production Design",
+        "Visual Effects",
+        "Writers"
+      ],
+      "x": 11.4425,
+      "y": 89.3773
+    },
+    "d03": {
+      "desc": "Topaz/Nvidia. Essential for remastering archival footage.",
+      "id": "d03",
+      "name": "Upscaling",
+      "tags": [
+        "Cinematographers",
+        "Film Editors",
+        "Visual Effects"
+      ],
+      "x": 18.55,
+      "y": 94.9
+    },
+    "d04": {
+      "desc": "Splitting vocals from music (stems). Industry standard.",
+      "id": "d04",
+      "name": "Audio Separation",
+      "tags": [
+        "Music",
+        "Sound"
+      ],
+      "x": 24.2,
+      "y": 92.8
+    },
+    "d05": {
+      "desc": "Magic Mask. Automating cutouts. 90% perfect, 10% manual fix.",
+      "id": "d05",
+      "name": "Rotoscoping",
+      "tags": [
+        "Visual Effects",
+        "Animation"
+      ],
+      "x": 29.0692,
+      "y": 86.8517
+    },
+    "d06": {
+      "desc": "Speech-to-text. Integrated into Premiere/DaVinci.",
+      "id": "d06",
+      "name": "Auto-Captions",
+      "tags": [
+        "Film Editors",
+        "Sound"
+      ],
+      "x": 33.482,
+      "y": 90.7544
+    },
+    "d07": {
+      "desc": "Matching Camera A colors to Camera B automatically.",
+      "id": "d07",
+      "name": "Color Match",
+      "tags": [
+        "Cinematographers",
+        "Visual Effects"
+      ],
+      "x": 39.7091,
+      "y": 81.0331
+    },
+    "d08": {
+      "desc": "Edit video by deleting words in the transcript.",
+      "id": "d08",
+      "name": "Text-Based Edit",
+      "tags": [
+        "Film Editors",
+        "Directors"
+      ],
+      "x": 55.9182,
+      "y": 69.9636
+    },
+    "d09": {
+      "desc": "Move.ai/Wonder Studio. Video -> 3D Animation.",
+      "id": "d09",
+      "name": "Markerless Mocap",
+      "tags": [
+        "Animation",
+        "Visual Effects",
+        "Actors"
+      ],
+      "x": 25,
+      "y": 73
+    },
+    "d10": {
+      "desc": "ElevenLabs. Tone is great, acting performance needs human guiding.",
+      "id": "d10",
+      "name": "Voice Cloning",
+      "tags": [
+        "Sound",
+        "Actors"
+      ],
+      "x": 52.4,
+      "y": 85
+    },
+    "d12": {
+      "desc": "Altering mouth movement. Can look 'uncanny' on closeups.",
+      "id": "d12",
+      "name": "Lip-Sync / Dub",
+      "tags": [
+        "Actors",
+        "Production and Technology",
+        "Sound",
+        "Visual Effects"
+      ],
+      "x": 58,
+      "y": 81.6477
+    },
+    "d13": {
+      "desc": "Removing objects. Great for still shots, struggles with motion.",
+      "id": "d13",
+      "name": "In-Painting",
+      "tags": [
+        "Visual Effects"
+      ],
+      "x": 68.7818,
+      "y": 70.2
+    },
+    "d14": {
+      "desc": "Midjourney. High readiness for concepts, but Low utility for final pixel.",
+      "id": "d14",
+      "name": "AI Storyboard",
+      "tags": [
+        "Directors",
+        "Producers",
+        "Production Design",
+        "Writers",
+        "Cinematographers"
+      ],
+      "x": 72.4116,
+      "y": 81.1957
+    },
+    "d15": {
+      "desc": "Extending sets. Hard to maintain temporal consistency.",
+      "id": "d15",
+      "name": "Gen Fill (Bg)",
+      "tags": [
+        "Visual Effects",
+        "Production Design"
+      ],
+      "x": 74.9364,
+      "y": 71.1636
+    },
+    "d16": {
+      "desc": "Generating foley or background music. Good for filler.",
+      "id": "d16",
+      "name": "Text-to-SFX",
+      "tags": [
+        "Sound"
+      ],
+      "x": 81.3835,
+      "y": 58.2446
+    },
+    "d17": {
+      "desc": "Generating 3D props. Topology usually needs manual cleanup.",
+      "id": "d17",
+      "name": "Text-to-3D",
+      "tags": [
+        "Animation",
+        "Visual Effects",
+        "Production Design"
+      ],
+      "x": 92.0727,
+      "y": 35.2455
+    },
+    "d18": {
+      "desc": "Sora/Gen-3. Dream-like visuals. Physics/Continuity break.",
+      "id": "d18",
+      "name": "Text-to-Video",
+      "tags": [
+        "Animation",
+        "Directors",
+        "Documentary",
+        "Visual Effects"
+      ],
+      "x": 89.5397,
+      "y": 44.1777
+    },
+    "d19": {
+      "desc": "One button to make a film. Pure fantasy right now.",
+      "id": "d19",
+      "name": "Text-to-Movie",
+      "tags": [
+        "Directors",
+        "Producers",
+        "Writers"
+      ],
+      "x": 99.0818,
+      "y": 1.36364
+    },
+    "user_item_1768624881877": {
+      "createdBy": "YKL5jdKqDba525cosjG5ao5w0Wl2",
+      "desc": "Provide a prompt and it writes a good script",
+      "id": "user_item_1768624881877",
+      "name": "Idea to Script",
+      "tags": [
+        "Writers"
+      ],
+      "x": 96.9531,
+      "y": 10.7816
+    },
+    "user_item_1768948088119": {
+      "createdBy": "MabLCo2gndXgUjcVhNFfmTDNkDu1",
+      "desc": "",
+      "id": "user_item_1768948088119",
+      "name": "Character In-Betweening",
+      "tags": [
+        "Animation",
+        "Visual Effects"
+      ],
+      "x": 62.6333,
+      "y": 61.3333
+    },
+    "user_item_1769533883075": {
+      "createdBy": "PVj22fBa1AgCWVaQzMVwy9C7Ie33",
+      "desc": "Removing noise/hiss from audio using machine learning tools",
+      "id": "user_item_1769533883075",
+      "name": "Denoising Sound",
+      "tags": [
+        "Sound"
+      ],
+      "x": 6.6,
+      "y": 94.9
+    },
+    "user_item_1769533943550": {
+      "createdBy": "GEaved2yWlRqw0mCIcCoiHaudUD3",
+      "desc": "AI used for cosmetic alterations",
+      "id": "user_item_1769533943550",
+      "name": "Cosmetic (de-aging)",
+      "tags": [
+        "Actors",
+        "Cinematographers"
+      ],
+      "x": 49.4,
+      "y": 73.9
+    },
+    "user_item_1769881004426": {
+      "createdBy": "YKL5jdKqDba525cosjG5ao5w0Wl2",
+      "desc": "Adapting a novel to a movie",
+      "id": "user_item_1769881004426",
+      "name": "Book to Script",
+      "tags": [
+        "Writers"
+      ],
+      "x": 95,
+      "y": 8
+    },
+    "user_item_1769881042085": {
+      "createdBy": "9uAhHIP2QXd9nkFIRQt75C35g5r2",
+      "desc": "",
+      "id": "user_item_1769881042085",
+      "name": "Plate restoration/cleanup",
+      "x": 10,
+      "y": 84
+    },
+    "user_item_1769881171416": {
+      "createdBy": "9uAhHIP2QXd9nkFIRQt75C35g5r2",
+      "desc": "Text to Concepts or similar assistance",
+      "id": "user_item_1769881171416",
+      "name": "Concept Art",
+      "tags": [
+        "Production Design",
+        "Visual Effects"
+      ],
+      "x": 88,
+      "y": 91
+    },
+    "user_item_1769881221542": {
+      "createdBy": "JxpPLh8qKlgzVsiEEbOciln4z1x1",
+      "desc": "Analysis for Explicit Content",
+      "id": "user_item_1769881221542",
+      "name": "Content Rating Analysis",
+      "tags": [
+        "Directors",
+        "Executives",
+        "Producers",
+        "Production and Technology"
+      ],
+      "x": 28,
+      "y": 66
+    },
+    "user_item_1769881360761": {
+      "createdBy": "9uAhHIP2QXd9nkFIRQt75C35g5r2",
+      "desc": "",
+      "id": "user_item_1769881360761",
+      "name": "3D Geometry Generation",
+      "tags": [
+        "Animation",
+        "Visual Effects"
+      ],
+      "x": 79,
+      "y": 54
+    },
+    "user_item_1774726643295": {
+      "createdBy": "YKL5jdKqDba525cosjG5ao5w0Wl2",
+      "desc": "Generative Characters that can be directed",
+      "id": "user_item_1774726643295",
+      "name": "Controllable Creatures",
+      "tags": [
+        "Animation",
+        "Visual Effects"
+      ],
+      "x": 69,
+      "y": 58
+    },
+    "user_item_1774996431355": {
+      "createdBy": "YKL5jdKqDba525cosjG5ao5w0Wl2",
+      "desc": "An digital character, prompted to act",
+      "id": "user_item_1774996431355",
+      "name": "Digital Actors",
+      "tags": [
+        "Actors",
+        "Directors"
+      ],
+      "x": 96,
+      "y": 5
+    },
+    "user_item_1780766470184": {
+      "createdBy": "FTWfF1SeD1Xg11o1MPXi2o4cO0w2",
+      "desc": "Tools that layout a 3D scene and camera to make an Image. Eg: intangible.ai",
+      "id": "user_item_1780766470184",
+      "name": "3D Layout-to-Image",
+      "tags": [
+        "Cinematographers",
+        "Directors",
+        "Short Films",
+        "Visual Effects"
+      ],
+      "x": 62,
+      "y": 84
+    },
+    "user_item_1780767215655": {
+      "createdBy": "UB6TZ5YEnMPMtzM1wwdpBU9qMzG2",
+      "desc": "Writing Soundalikes of Songs feeded with AI generated lyrics",
+      "id": "user_item_1780767215655",
+      "name": "Song Soundalikes",
+      "tags": [
+        "Music"
+      ],
+      "x": 88,
+      "y": 93
+    },
+    "user_item_1780767521906": {
+      "createdBy": "L8HYrfj2qyMReIPWI4nJz6CgDYJ3",
+      "desc": "To make a Color image identifying grey shades of Black & White Image",
+      "id": "user_item_1780767521906",
+      "name": "Black & White to Color Imaging",
+      "tags": [
+        "Production and Technology"
+      ],
+      "x": 50,
+      "y": 50
+    }
+  },
+  "votes": {
+    "d01": {
+      "1NNDJHWh5DOXYrmhP1QfwahR1n62": {
+        "username": "Rob",
+        "x": 3.6,
+        "y": 90.8
+      },
+      "gAOpJXK3TTPYlISiKTwi02MuOl52": {
+        "username": "Amber-Owl-790",
+        "x": 3.1,
+        "y": 93.8
+      },
+      "iIRD8oTraXfQnJc36OeKXcvJjVt2": {
+        "username": "JC Bond",
+        "x": 14.2,
+        "y": 92
+      },
+      "kwhj81G4pfWPTDHge13wOIwA5hb2": {
+        "username": "Nick C",
+        "x": 5.2,
+        "y": 97.9
+      },
+      "vpodBq4BKrUYEPh0EUNmxjnoiW73": {
+        "username": "Light-Blue-Lion-246",
+        "x": 4.3,
+        "y": 94.6
+      }
+    },
+    "d02": {
+      "1NNDJHWh5DOXYrmhP1QfwahR1n62": {
+        "username": "Rob",
+        "x": 48.2,
+        "y": 89
+      },
+      "7T8SclBHHpgLCR1F92pa3F9dZrp2": {
+        "username": "Blue-Shark-203",
+        "x": 12.7,
+        "y": 89.4
+      },
+      "gAOpJXK3TTPYlISiKTwi02MuOl52": {
+        "username": "Amber-Owl-790",
+        "x": 10.9,
+        "y": 89.4
+      },
+      "iIRD8oTraXfQnJc36OeKXcvJjVt2": {
+        "username": "JC Bond",
+        "x": 17.2,
+        "y": 89.4
+      },
+      "uVWG6wAXviYp4azo9uqOM2tQRIT2": {
+        "username": "Red-Bear-958",
+        "x": 12,
+        "y": 89.4
+      }
+    },
+    "d03": {
+      "9uAhHIP2QXd9nkFIRQt75C35g5r2": {
+        "username": "Hanno",
+        "x": 18.9,
+        "y": 66.3
+      },
+      "AKWGfKJEtHP1WXz2zEKuQ82ZIY73": {
+        "username": "Cyan-Panda-493",
+        "x": 13,
+        "y": 89.6
+      },
+      "gAOpJXK3TTPYlISiKTwi02MuOl52": {
+        "username": "Amber-Owl-790",
+        "x": 18,
+        "y": 93.3
+      },
+      "vpodBq4BKrUYEPh0EUNmxjnoiW73": {
+        "username": "Light-Blue-Lion-246",
+        "x": 15.8,
+        "y": 92.6
+      }
+    },
+    "d04": {
+      "0tn0mDj4HOgf5UhinlCi7CvDOk13": {
+        "username": "Yellow-Dolphin-219",
+        "x": 23.3,
+        "y": 92
+      },
+      "9uAhHIP2QXd9nkFIRQt75C35g5r2": {
+        "username": "Hanno",
+        "x": 24.2,
+        "y": 76.3
+      },
+      "gAOpJXK3TTPYlISiKTwi02MuOl52": {
+        "username": "Amber-Owl-790",
+        "x": 23.6,
+        "y": 92.8
+      },
+      "oi14FQpMG8U1QAmvc6ZCfnlZlpq1": {
+        "username": "Silver-Dolphin-144",
+        "x": 23,
+        "y": 93
+      }
+    },
+    "d05": {
+      "9uAhHIP2QXd9nkFIRQt75C35g5r2": {
+        "username": "Hanno",
+        "x": 27.9,
+        "y": 64.9
+      },
+      "AKWGfKJEtHP1WXz2zEKuQ82ZIY73": {
+        "username": "Cyan-Panda-493",
+        "x": 20.3,
+        "y": 77.3
+      },
+      "gAOpJXK3TTPYlISiKTwi02MuOl52": {
+        "username": "Amber-Owl-790",
+        "x": 28.4,
+        "y": 87.3
+      },
+      "iIRD8oTraXfQnJc36OeKXcvJjVt2": {
+        "username": "JC Bond",
+        "x": 28.3,
+        "y": 91.1
+      }
+    },
+    "d06": {
+      "YKL5jdKqDba525cosjG5ao5w0Wl2": {
+        "username": "Rob",
+        "x": 33.3,
+        "y": 90.9
+      },
+      "gAOpJXK3TTPYlISiKTwi02MuOl52": {
+        "username": "Amber-Owl-790",
+        "x": 32.6,
+        "y": 90.8
+      }
+    },
+    "d07": {
+      "iIRD8oTraXfQnJc36OeKXcvJjVt2": {
+        "username": "JC Bond",
+        "x": 38.2,
+        "y": 89.9
+      }
+    },
+    "d08": {
+      "gAOpJXK3TTPYlISiKTwi02MuOl52": {
+        "username": "Amber-Owl-790",
+        "x": 55.3,
+        "y": 71.1
+      },
+      "wuELvwgy1nTSewKE3ldKDxJOaCC3": {
+        "username": "Chaitanya C",
+        "x": 55.2,
+        "y": 83.5
+      }
+    },
+    "d09": {
+      "gAOpJXK3TTPYlISiKTwi02MuOl52": {
+        "username": "Amber-Owl-790",
+        "x": 46.3,
+        "y": 84.5
+      },
+      "iIRD8oTraXfQnJc36OeKXcvJjVt2": {
+        "username": "JC Bond",
+        "x": 41.4,
+        "y": 84.5
+      },
+      "vpodBq4BKrUYEPh0EUNmxjnoiW73": {
+        "username": "Light-Blue-Lion-246",
+        "x": 18.3,
+        "y": 75.5
+      }
+    },
+    "d10": {
+      "94is7USmiGNgQgLqy7vGwUXOHBJ3": {
+        "username": "Red-Elephant-306",
+        "x": 51.7,
+        "y": 91.7
+      },
+      "gAOpJXK3TTPYlISiKTwi02MuOl52": {
+        "username": "Amber-Owl-790",
+        "x": 51.6,
+        "y": 86.4
+      },
+      "kwhj81G4pfWPTDHge13wOIwA5hb2": {
+        "username": "Nick C",
+        "x": 49.1,
+        "y": 91.2
+      },
+      "vpodBq4BKrUYEPh0EUNmxjnoiW73": {
+        "username": "Light-Blue-Lion-246",
+        "x": 54.2,
+        "y": 86.5
+      },
+      "zOxtZK2qvfbIYyfayL1DSEPQ69I3": {
+        "username": "Orange-Elephant-853",
+        "x": 51.7,
+        "y": 91
+      }
+    },
+    "d11": {
+      "94is7USmiGNgQgLqy7vGwUXOHBJ3": {
+        "username": "Red-Elephant-306",
+        "x": 36.8,
+        "y": 84.9
+      },
+      "wuELvwgy1nTSewKE3ldKDxJOaCC3": {
+        "username": "Chaitanya C",
+        "x": 37.4,
+        "y": 92
+      }
+    },
+    "d12": {
+      "94is7USmiGNgQgLqy7vGwUXOHBJ3": {
+        "username": "Red-Elephant-306",
+        "x": 58,
+        "y": 90.5
+      },
+      "gAOpJXK3TTPYlISiKTwi02MuOl52": {
+        "username": "Amber-Owl-790",
+        "x": 57.2,
+        "y": 81.5
+      },
+      "wuELvwgy1nTSewKE3ldKDxJOaCC3": {
+        "username": "Chaitanya C",
+        "x": 64,
+        "y": 88.6
+      }
+    },
+    "d13": {
+      "76jSsm0UI5f7m0BKNF9VJMsdDc83": {
+        "username": "Andrew Roberts",
+        "x": 68.3,
+        "y": 74.7
+      },
+      "7T8SclBHHpgLCR1F92pa3F9dZrp2": {
+        "username": "Blue-Shark-203",
+        "x": 68,
+        "y": 71.8
+      },
+      "gAOpJXK3TTPYlISiKTwi02MuOl52": {
+        "username": "Amber-Owl-790",
+        "x": 68.2,
+        "y": 72.4
+      },
+      "mA7Bgc3BSdgrMGRz6r48qLGJ1yB3": {
+        "username": "Gold-Owl-462",
+        "x": 67.2,
+        "y": 80.1
+      },
+      "uVWG6wAXviYp4azo9uqOM2tQRIT2": {
+        "username": "Red-Bear-958",
+        "x": 68.6,
+        "y": 71.7
+      },
+      "vpodBq4BKrUYEPh0EUNmxjnoiW73": {
+        "username": "Light-Blue-Lion-246",
+        "x": 68.4,
+        "y": 71.2
+      },
+      "wuELvwgy1nTSewKE3ldKDxJOaCC3": {
+        "username": "Chaitanya C",
+        "x": 67.6,
+        "y": 87.7
+      }
+    },
+    "d14": {
+      "94is7USmiGNgQgLqy7vGwUXOHBJ3": {
+        "username": "Red-Elephant-306",
+        "x": 73.1,
+        "y": 49.9
+      },
+      "gAOpJXK3TTPYlISiKTwi02MuOl52": {
+        "username": "Amber-Owl-790",
+        "x": 71.7,
+        "y": 80.8
+      },
+      "uVWG6wAXviYp4azo9uqOM2tQRIT2": {
+        "username": "Red-Bear-958",
+        "x": 72.3,
+        "y": 80.9
+      },
+      "vpodBq4BKrUYEPh0EUNmxjnoiW73": {
+        "username": "Light-Blue-Lion-246",
+        "x": 72.5,
+        "y": 68.9
+      },
+      "zOxtZK2qvfbIYyfayL1DSEPQ69I3": {
+        "username": "Orange-Elephant-853",
+        "x": 72.4,
+        "y": 71
+      }
+    },
+    "d15": {
+      "gAOpJXK3TTPYlISiKTwi02MuOl52": {
+        "username": "Amber-Owl-790",
+        "x": 74.1,
+        "y": 72
+      },
+      "wuELvwgy1nTSewKE3ldKDxJOaCC3": {
+        "username": "Chaitanya C",
+        "x": 75,
+        "y": 87.3
+      }
+    },
+    "d16": {
+      "94is7USmiGNgQgLqy7vGwUXOHBJ3": {
+        "username": "Red-Elephant-306",
+        "x": 81.5,
+        "y": 69.8
+      },
+      "wuELvwgy1nTSewKE3ldKDxJOaCC3": {
+        "username": "Chaitanya C",
+        "x": 87,
+        "y": 84.6
+      }
+    },
+    "d18": {
+      "76jSsm0UI5f7m0BKNF9VJMsdDc83": {
+        "username": "Andrew Roberts",
+        "x": 89.8,
+        "y": 50.7
+      },
+      "94is7USmiGNgQgLqy7vGwUXOHBJ3": {
+        "username": "Red-Elephant-306",
+        "x": 89.5,
+        "y": 52.8
+      },
+      "L8HYrfj2qyMReIPWI4nJz6CgDYJ3": {
+        "username": "Ujwal Nirgudkar",
+        "x": 86.9,
+        "y": 59.1
+      },
+      "kwhj81G4pfWPTDHge13wOIwA5hb2": {
+        "username": "Nick C",
+        "x": 93.5,
+        "y": 42.6
+      }
+    },
+    "d19": {
+      "94is7USmiGNgQgLqy7vGwUXOHBJ3": {
+        "username": "Red-Elephant-306",
+        "x": 98.7,
+        "y": 32.6
+      },
+      "zOxtZK2qvfbIYyfayL1DSEPQ69I3": {
+        "username": "Orange-Elephant-853",
+        "x": 99,
+        "y": 2.3
+      }
+    },
+    "user_item_1768624881877": {
+      "94is7USmiGNgQgLqy7vGwUXOHBJ3": {
+        "username": "Red-Elephant-306",
+        "x": 96.9,
+        "y": 6.7
+      },
+      "wuELvwgy1nTSewKE3ldKDxJOaCC3": {
+        "username": "Chaitanya C",
+        "x": 97.1,
+        "y": 5.2
+      }
+    },
+    "user_item_1768948088119": {
+      "vpodBq4BKrUYEPh0EUNmxjnoiW73": {
+        "username": "Light-Blue-Lion-246",
+        "x": 64.3,
+        "y": 57.7
+      },
+      "xvxz2VUxN6QLJQcoDCpSNVacwWu1": {
+        "username": "Light-Blue-Owl-690",
+        "x": 44.8,
+        "y": 70.5
+      }
+    },
+    "user_item_1769533883075": {
+      "gAOpJXK3TTPYlISiKTwi02MuOl52": {
+        "username": "Amber-Owl-790",
+        "x": 6.2,
+        "y": 94.9
+      }
+    },
+    "user_item_1769533943550": {
+      "0tn0mDj4HOgf5UhinlCi7CvDOk13": {
+        "username": "Yellow-Dolphin-219",
+        "x": 48.2,
+        "y": 77.6
+      },
+      "gAOpJXK3TTPYlISiKTwi02MuOl52": {
+        "username": "Amber-Owl-790",
+        "x": 48.6,
+        "y": 75.2
+      },
+      "iIRD8oTraXfQnJc36OeKXcvJjVt2": {
+        "username": "JC Bond",
+        "x": 52,
+        "y": 79.8
+      },
+      "sQmcrde3fla7B0kj1CedL9EtJzv2": {
+        "username": "Rod Maxwell",
+        "x": 49.6,
+        "y": 88.5
+      },
+      "wuELvwgy1nTSewKE3ldKDxJOaCC3": {
+        "username": "Chaitanya C",
+        "x": 50.6,
+        "y": 85.8
+      },
+      "zOxtZK2qvfbIYyfayL1DSEPQ69I3": {
+        "username": "Orange-Elephant-853",
+        "x": 49.3,
+        "y": 83.8
+      }
+    },
+    "user_item_1769881004426": {
+      "94is7USmiGNgQgLqy7vGwUXOHBJ3": {
+        "username": "Red-Elephant-306",
+        "x": 94.8,
+        "y": 6.5
+      },
+      "kwhj81G4pfWPTDHge13wOIwA5hb2": {
+        "username": "Nick C",
+        "x": 97.6,
+        "y": 5.2
+      }
+    },
+    "user_item_1769881031837": {
+      "wuELvwgy1nTSewKE3ldKDxJOaCC3": {
+        "username": "Chaitanya C",
+        "x": 7.3,
+        "y": 81.2
+      }
+    },
+    "user_item_1769881042085": {
+      "9uAhHIP2QXd9nkFIRQt75C35g5r2": {
+        "username": "Hanno",
+        "x": 10,
+        "y": 84
+      },
+      "vpodBq4BKrUYEPh0EUNmxjnoiW73": {
+        "username": "Light-Blue-Lion-246",
+        "x": 20,
+        "y": 85.3
+      },
+      "xnSXjsXluCT5QM285duZasGsWMR2": {
+        "username": "JB",
+        "x": 85.1,
+        "y": 100
+      }
+    },
+    "user_item_1769881171416": {
+      "9uAhHIP2QXd9nkFIRQt75C35g5r2": {
+        "username": "Hanno",
+        "x": 88,
+        "y": 91
+      },
+      "kwhj81G4pfWPTDHge13wOIwA5hb2": {
+        "username": "Nick C",
+        "x": 93.6,
+        "y": 69.7
+      },
+      "vpodBq4BKrUYEPh0EUNmxjnoiW73": {
+        "username": "Light-Blue-Lion-246",
+        "x": 89,
+        "y": 86.3
+      },
+      "zOxtZK2qvfbIYyfayL1DSEPQ69I3": {
+        "username": "Orange-Elephant-853",
+        "x": 94.5,
+        "y": 90
+      }
+    },
+    "user_item_1769881221542": {
+      "JxpPLh8qKlgzVsiEEbOciln4z1x1": {
+        "username": "Deep-Purple-Zebra-935",
+        "x": 28,
+        "y": 66
+      },
+      "L8HYrfj2qyMReIPWI4nJz6CgDYJ3": {
+        "username": "Ujwal Nirgudkar",
+        "x": 24.5,
+        "y": 74.2
+      }
+    },
+    "user_item_1769881339160": {
+      "9uAhHIP2QXd9nkFIRQt75C35g5r2": {
+        "username": "Hanno",
+        "x": 47,
+        "y": 91
+      }
+    },
+    "user_item_1769881360761": {
+      "9uAhHIP2QXd9nkFIRQt75C35g5r2": {
+        "username": "Hanno",
+        "x": 79,
+        "y": 54
+      },
+      "vpodBq4BKrUYEPh0EUNmxjnoiW73": {
+        "username": "Light-Blue-Lion-246",
+        "x": 78.8,
+        "y": 56.3
+      }
+    },
+    "user_item_1774726643295": {
+      "vpodBq4BKrUYEPh0EUNmxjnoiW73": {
+        "username": "Light-Blue-Lion-246",
+        "x": 71,
+        "y": 55.1
+      }
+    },
+    "user_item_1774996431355": {
+      "YKL5jdKqDba525cosjG5ao5w0Wl2": {
+        "username": "Rob",
+        "x": 96,
+        "y": 5
+      }
+    },
+    "user_item_1780767215655": {
+      "UB6TZ5YEnMPMtzM1wwdpBU9qMzG2": {
+        "username": "Orange-Shark-382",
+        "x": 87.5,
+        "y": 87
+      }
+    },
+    "user_item_1780767521906": {
+      "L8HYrfj2qyMReIPWI4nJz6CgDYJ3": {
+        "username": "Ujwal Nirgudkar",
+        "x": 46.7,
+        "y": 62.8
+      }
+    }
+  }
+}

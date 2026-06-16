@@ -328,29 +328,83 @@ function throttle(func, limit) {
     };
 }
 
-onAuthStateChanged(auth, (user) => {
-    if (user) {
-        currentUser = user;
-        isAdmin = user.email === ADMIN_EMAIL;
-        updateAdminUI();
+// --- BOOTSTRAP ----------------------------------------------------------
+// Static-first boot: render from the committed snapshot (data/snapshot.json)
+// and only open a live Firebase connection when voting is actually enabled.
+// When the board is frozen (votingEnabled:false) there is nothing to stream,
+// so we skip anonymous sign-in and the three RTDB listeners entirely — the
+// page never touches the live database. The snapshot's own settings flag is
+// the switch; an admin can always force the live path with ?live=1.
+let isStaticMode = false;
+let staticSnapshot = null;
 
-        // Check if we already have a display name for this session
-        if (!userDisplayName) {
-            userDisplayName =
-                localStorage.getItem("voter_name") || generateDefaultUsername();
-            hasConfirmedName = !!localStorage.getItem("voter_name_confirmed");
-        }
-        updateUsernameUI();
-        initApp();
-
-        // Remove initial-load class after data has likely settled
-        setTimeout(() => {
-            document.body.classList.remove("initial-load");
-        }, 2000);
-    } else {
-        signInAnonymously(auth).catch((e) => console.error("Anon Auth failed", e));
+function ensureDisplayName() {
+    // Reuse a previously chosen name (for display only — voting needs live mode)
+    if (!userDisplayName) {
+        userDisplayName =
+            localStorage.getItem("voter_name") || generateDefaultUsername();
+        hasConfirmedName = !!localStorage.getItem("voter_name_confirmed");
     }
-});
+    updateUsernameUI();
+}
+
+async function boot() {
+    let snapshot = null;
+    try {
+        const res = await fetch("./data/snapshot.json", { cache: "no-cache" });
+        if (res.ok) snapshot = await res.json();
+    } catch (e) {
+        console.warn("Snapshot unavailable; falling back to live DB.", e);
+    }
+
+    const forceLive = new URLSearchParams(window.location.search).has("live");
+    const snapshotWantsLive = snapshot?.settings?.votingEnabled === true;
+
+    // Go live when explicitly forced, when there is no usable snapshot, or when
+    // the snapshot itself reports voting is open. Otherwise serve it frozen.
+    if (forceLive || !snapshot || snapshotWantsLive) {
+        startLive();
+    } else {
+        startStatic(snapshot);
+    }
+}
+
+function startLive() {
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            currentUser = user;
+            isAdmin = user.email === ADMIN_EMAIL;
+            updateAdminUI();
+            ensureDisplayName();
+            initApp();
+
+            // Remove initial-load class after data has likely settled
+            setTimeout(() => {
+                document.body.classList.remove("initial-load");
+            }, 2000);
+        } else {
+            signInAnonymously(auth).catch((e) => console.error("Anon Auth failed", e));
+        }
+    });
+}
+
+function startStatic(snapshot) {
+    // No Firebase auth: currentUser stays null, which gates off every drag/
+    // vote/write path. isAdmin is false too — admins use ?live=1 to manage.
+    isStaticMode = true;
+    staticSnapshot = snapshot;
+    isAdmin = false;
+    votingEnabled = !!(snapshot.settings && snapshot.settings.votingEnabled);
+    addingEnabled = !!(snapshot.settings && snapshot.settings.addingEnabled);
+    updateAdminUI();
+    ensureDisplayName();
+    initApp();
+    setTimeout(() => {
+        document.body.classList.remove("initial-load");
+    }, 2000);
+}
+
+boot();
 
 function updateUsernameUI() {
     const nameSpan = document.getElementById("current-username");
@@ -414,7 +468,13 @@ function showUsernamePrompt() {
                 signInWithPopup(auth, googleProvider).then(() => {
                     modal.style.display = "none";
                     showToast("Logged in successfully. Reloading...");
-                    setTimeout(() => window.location.reload(), 800);
+                    // Reload into live mode so admin controls + writes work even
+                    // when the committed snapshot has voting frozen.
+                    setTimeout(() => {
+                        const url = new URL(window.location.href);
+                        url.searchParams.set("live", "1");
+                        window.location.href = url.toString();
+                    }, 800);
                 }).catch((error) => {
                     console.error(error);
                     alert("Login Failed: " + error.message);
@@ -585,11 +645,15 @@ function initApp() {
     const userDisplay = document.getElementById("user-display");
     if (userDisplay) userDisplay.onclick = () => showUsernamePrompt();
 
-    const itemsRef = ref(db, "items");
-    onValue(itemsRef, (snapshot) => {
-        const itemsData = snapshot.val();
+    // Data binding. The same apply* functions render both modes: in live mode
+    // they are driven by RTDB onValue listeners; in static mode they run once
+    // against the committed snapshot and no socket is ever opened.
+    function applyItems(itemsData) {
         itemsCache = itemsData || {};
         if (!itemsData) {
+            // Only seed the live DB when it is genuinely empty. Never write from
+            // static mode — there is no auth and the snapshot is the source.
+            if (isStaticMode) return;
             const updates = {};
             initialItems.forEach((item) => {
                 updates["items/" + item.id] = item;
@@ -616,22 +680,16 @@ function initApp() {
         }
         // After items are created/updated, schedule label de-overlap
         scheduleResolveLabels();
-    });
+    }
 
-    const votesRef = ref(db, "votes");
-    onValue(votesRef, (snapshot) => {
-        const data = snapshot.val() || {};
-        updateGraphFromData(data, container);
-    });
+    function applyVotes(data) {
+        updateGraphFromData(data || {}, container);
+    }
 
-    const settingsRef = ref(db, "settings");
-    onValue(settingsRef, (snapshot) => {
-        const settings = snapshot.val() || {
-            votingEnabled: true,
-            addingEnabled: true,
-        };
-        votingEnabled = settings.votingEnabled;
-        addingEnabled = settings.addingEnabled;
+    function applySettings(settings) {
+        const s = settings || { votingEnabled: true, addingEnabled: true };
+        votingEnabled = s.votingEnabled;
+        addingEnabled = s.addingEnabled;
 
         const toggleVoting = document.getElementById("toggle-voting");
         const toggleAdding = document.getElementById("toggle-adding");
@@ -652,7 +710,20 @@ function initApp() {
                 editBtn.style.display = (addingEnabled || isAdmin) ? "block" : "none";
             }
         });
-    });
+    }
+
+    if (isStaticMode) {
+        // Apply once, in dependency order: items (build dots) -> votes
+        // (consensus needs itemsCache) -> settings (toggles/edit visibility).
+        const snap = staticSnapshot || {};
+        applyItems(snap.items || null);
+        applyVotes(snap.votes || {});
+        applySettings(snap.settings || null);
+    } else {
+        onValue(ref(db, "items"), (snapshot) => applyItems(snapshot.val()));
+        onValue(ref(db, "votes"), (snapshot) => applyVotes(snapshot.val() || {}));
+        onValue(ref(db, "settings"), (snapshot) => applySettings(snapshot.val()));
+    }
 }
 
 // --- GLOBAL TOUCH/CLICK HANDLERS ---

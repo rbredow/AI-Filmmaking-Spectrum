@@ -186,21 +186,19 @@ p {
 }
 
 .panel-row.row-active .panel-row-num {
-    background: #3b82f6;
-    border-color: #3b82f6;
-    color: #fff;
+    box-shadow: 0 0 0 2px #3b82f6;
 }
 
 .panel-row-name {
     font-size: var(--fs-lg);
-    font-weight: 600;
-    color: #eee;
+    font-weight: 500;
+    color: #b4b4b4;
     margin-bottom: 0;
     line-height: 1.2;
 }
 
 .panel-row.row-active .panel-row-name {
-    color: #fff;
+    color: #f0f0f0;
 }
 
 .panel-metrics {
@@ -348,17 +346,18 @@ p {
 }
 
 .y-label-top {
-    top: -25px;
-    left: -10px;
+    top: 8px;
+    left: 10px;
     color: #00e676;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
 }
 
 .y-label-bottom {
-    bottom: 0px;
-    left: -80px;
+    bottom: 10px;
+    left: 10px;
     color: #ff3d00;
-    width: 70px;
-    text-align: right;
+    text-align: left;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
 }
 
 /* Top Right Controls Group */
@@ -383,16 +382,16 @@ p {
     position: relative;
     background: #3b82f6;
     color: #fff;
-    font-size: var(--fs-base);
+    font-size: var(--fs-sm);
     font-weight: 700;
     cursor: pointer;
-    height: 34px;
-    line-height: 32px;
+    height: 28px;
+    line-height: 26px;
     user-select: none;
     -webkit-user-select: none;
     transition: background 0.2s, transform 0.2s;
     border: none;
-    padding: 0 16px;
+    padding: 0 12px;
     border-radius: 4px;
     box-sizing: border-box;
     display: flex;
@@ -418,11 +417,11 @@ p {
 
 #branch-filter-btn {
     color: #888;
-    font-size: var(--fs-base);
+    font-size: var(--fs-sm);
     font-weight: 700;
     cursor: pointer;
-    height: 34px;
-    line-height: 32px; /* Adjusted for border */
+    height: 28px;
+    line-height: 26px; /* Adjusted for border */
     user-select: none;
     -webkit-user-select: none;
     transition: color 0.2s;
@@ -476,11 +475,11 @@ p {
 #view-mode-btn {
     position: relative;
     color: #888;
-    font-size: var(--fs-base);
+    font-size: var(--fs-sm);
     font-weight: 700;
     cursor: pointer;
-    height: 34px;
-    line-height: 32px;
+    height: 28px;
+    line-height: 26px;
     user-select: none;
     -webkit-user-select: none;
     transition: color 0.2s;
@@ -592,7 +591,7 @@ p {
     padding: 0 10px;
     border-radius: 4px;
     transition: all 0.3s;
-    height: 34px;
+    height: 28px;
     box-sizing: border-box;
 }
 
@@ -605,7 +604,7 @@ p {
     background: transparent;
     border: none;
     color: #eee;
-    font-size: var(--fs-base);
+    font-size: var(--fs-sm);
     padding: 4px 0;
     width: 80px;
     outline: none;
@@ -794,7 +793,7 @@ p {
 
 .dot:hover,
 .dot.force-tooltip {
-    z-index: 100;
+    z-index: 1100;
     transform: translate(-50%, 50%) scale(1.2);
     border-color: #fff;
 }
@@ -1027,6 +1026,10 @@ p {
 }
 
 /* TOOLTIP TRIGGER - Mobile tap */
+.dot.tooltip-active {
+    z-index: 1100;
+}
+
 .dot.tooltip-active .tooltip {
     visibility: visible;
     opacity: 1;
@@ -1159,15 +1162,15 @@ p {
 }
 
 button {
-    padding: 8px 16px;
+    padding: 6px 14px;
     border: none;
     border-radius: 4px;
     cursor: pointer;
     background: #333;
     color: #ccc;
-    font-size: var(--fs-base);
-    min-height: 44px;
-    min-width: 44px;
+    font-size: var(--fs-sm);
+    min-height: 34px;
+    min-width: 34px;
 }
 
 button:hover {
@@ -1751,7 +1754,7 @@ button:active {
 
     /* Panel is fixed-width on the right; only it scrolls */
     #tool-panel {
-        flex: 0 0 320px;
+        flex: 0 0 270px;
         min-height: 0;
         height: auto;
         overflow-y: auto;
@@ -1828,7 +1831,7 @@ button:active {
 
     /* Tooltip shown via JS class on tap */
     .dot.tooltip-active {
-        z-index: 100;
+        z-index: 1100;
     }
 
     .dot.tooltip-active .tooltip {

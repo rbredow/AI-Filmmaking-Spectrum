@@ -919,8 +919,8 @@ function setupResetModalLogic() {
         const dot = document.getElementById(`dot-${id}`);
         if (id && dot) {
             // Read current visual position (Consensus)
-            const currentX = parseFloat(dot.style.left);
-            const currentY = parseFloat(dot.style.bottom);
+            const currentX = parseFloat(dot.dataset.realX);
+            const currentY = parseFloat(dot.dataset.realY);
 
             // Update Item Baseline & Clear Votes
             update(ref(db, "items/" + id), { x: currentX, y: currentY });
@@ -1028,8 +1028,8 @@ function setupGlobalResetLogic() {
             renderedItems.forEach((id) => {
                 const dot = document.getElementById(`dot-${id}`);
                 if (dot) {
-                    const currentX = parseFloat(dot.style.left);
-                    const currentY = parseFloat(dot.style.bottom);
+                    const currentX = parseFloat(dot.dataset.realX);
+                    const currentY = parseFloat(dot.dataset.realY);
 
                     // We only update X/Y, we keep name/desc intact
                     updates[`items/${id}/x`] = currentX;
@@ -1147,6 +1147,13 @@ function createItemElements(container, item) {
         tooltip.style.transform = "translateX(-20px)";
     }
 
+    // For dots high on the chart, drop the tooltip BELOW the dot so it doesn't
+    // spill off the top of the screen.
+    if (item.y > 62) {
+        tooltip.style.bottom = "auto";
+        tooltip.style.top = "26px";
+    }
+
     avgDot.appendChild(tooltip);
     container.appendChild(avgDot);
 
@@ -1251,8 +1258,8 @@ function renderToolPanel() {
         const number = index + 1;
         // Read consensus position from DOM if available (works in both modes)
         const dot = document.getElementById(`dot-${item.id}`);
-        const xVal = dot && dot.style.left ? Math.round(parseFloat(dot.style.left)) : Math.round(item.x || 0);
-        const yVal = dot && dot.style.bottom ? Math.round(parseFloat(dot.style.bottom)) : Math.round(item.y || 0);
+        const xVal = dot && dot.dataset.realX != null ? Math.round(parseFloat(dot.dataset.realX)) : Math.round(item.x || 0);
+        const yVal = dot && dot.dataset.realY != null ? Math.round(parseFloat(dot.dataset.realY)) : Math.round(item.y || 0);
 
         const row = document.createElement("div");
         row.className = "panel-row";
@@ -1266,7 +1273,7 @@ function renderToolPanel() {
         // Row HTML — all user fields escaped
         row.innerHTML = `
             <div class="panel-row-head">
-                <span class="panel-row-num">${number}</span>
+                <span class="panel-row-num" id="rownum-${item.id}" style="background-color:${readinessColor(yVal)}; border-color:${readinessColor(yVal)}; color:#0a0a0a;">${number}</span>
                 <div class="panel-row-name"></div>
             </div>
             <div class="panel-metrics">
@@ -1431,8 +1438,8 @@ function setupDrag(avgDot, userDot, item, container) {
             } else {
                 const avgDotDom = document.getElementById(`dot-${item.id}`);
                 if (avgDotDom) {
-                    const currentBottom = avgDotDom.style.bottom;
-                    if (currentBottom) targetY = parseFloat(currentBottom);
+                    const currentBottom = avgDotDom.dataset.realY;
+                    if (currentBottom != null) targetY = parseFloat(currentBottom);
                     else targetY = item.y;
                 }
             }
@@ -1507,16 +1514,18 @@ function setupDrag(avgDot, userDot, item, container) {
             if (newX > container.clientWidth) newX = container.clientWidth;
             if (newY < 0) newY = 0;
             if (newY > container.clientHeight) newY = container.clientHeight;
-            let percentX = (newX / container.clientWidth) * 100;
-            let percentY = 100 - (newY / container.clientHeight) * 100;
+            let pointerX = (newX / container.clientWidth) * 100;
+            let pointerY = 100 - (newY / container.clientHeight) * 100;
+            let percentX = Math.max(0, Math.min(100, unplotPct(pointerX)));
+            let percentY = Math.max(0, Math.min(100, unplotPct(pointerY)));
 
             updateElementPosition(activeDot, percentX, percentY);
             updateFirebase(percentX, percentY);
 
             const avgDot = document.getElementById(`dot-${item.id}`);
             if (avgDot) {
-                const avgX = parseFloat(avgDot.style.left);
-                const avgY = parseFloat(avgDot.style.bottom);
+                const avgX = parseFloat(avgDot.dataset.realX);
+                const avgY = parseFloat(avgDot.dataset.realY);
                 updateConnectionLine(item.id, avgX, avgY, percentX, percentY);
             }
             activeDot.dataset.tempX = percentX;
@@ -1557,8 +1566,8 @@ function setupDrag(avgDot, userDot, item, container) {
                     } else {
                         const avgDotDom = document.getElementById(`dot-${item.id}`);
                         if (avgDotDom) {
-                            const currentBottom = avgDotDom.style.bottom;
-                            if (currentBottom) targetY = parseFloat(currentBottom);
+                            const currentBottom = avgDotDom.dataset.realY;
+                            if (currentBottom != null) targetY = parseFloat(currentBottom);
                             else targetY = item.y;
                         }
                     }
@@ -1832,6 +1841,12 @@ function updateGraphFromData(allVotes, container) {
                 barReady.style.width = Math.round(avgY) + "%";
                 barReady.style.backgroundColor = readinessColor(avgY);
             }
+            const rowNum = document.getElementById(`rownum-${itemId}`);
+            if (rowNum) {
+                const rc = readinessColor(avgY);
+                rowNum.style.backgroundColor = rc;
+                rowNum.style.borderColor = rc;
+            }
             if (numGen) numGen.textContent = Math.round(avgX) + "%";
             if (numReady) numReady.textContent = Math.round(avgY) + "%";
 
@@ -1887,8 +1902,8 @@ function updateGraphFromData(allVotes, container) {
                     updateElementPosition(userDot, myVote.x, myVote.y);
                     updateConnectionLine(itemId, avgX, avgY, myVote.x, myVote.y);
                 } else {
-                    const currentDomLeft = parseFloat(userDot.style.left);
-                    const currentDomBottom = parseFloat(userDot.style.bottom);
+                    const currentDomLeft = parseFloat(userDot.dataset.realX);
+                    const currentDomBottom = parseFloat(userDot.dataset.realY);
                     updateConnectionLine(
                         itemId,
                         avgX,
@@ -1914,10 +1929,10 @@ function updateConnectionLine(itemId, x1, y1, x2, y2) {
     const line = document.getElementById(`line-${itemId}`);
     if (line) {
         line.style.display = "block";
-        line.setAttribute("x1", x1);
-        line.setAttribute("y1", 100 - y1);
-        line.setAttribute("x2", x2);
-        line.setAttribute("y2", 100 - y2);
+        line.setAttribute("x1", plotPct(x1));
+        line.setAttribute("y1", 100 - plotPct(y1));
+        line.setAttribute("x2", plotPct(x2));
+        line.setAttribute("y2", 100 - plotPct(y2));
     }
 }
 
@@ -1925,8 +1940,8 @@ function triggerSplash(container, x, y) {
     if (Date.now() - window.appLaunchTime < 2000) return;
     const splash = document.createElement("div");
     splash.className = "splash";
-    splash.style.left = x + "%";
-    splash.style.bottom = y + "%";
+    splash.style.left = plotPct(x) + "%";
+    splash.style.bottom = plotPct(y) + "%";
     container.appendChild(splash);
     setTimeout(() => splash.remove(), 600);
 }
@@ -1935,15 +1950,28 @@ function triggerMegaSplash(container, x, y) {
     if (Date.now() - window.appLaunchTime < 2000) return;
     const splash = document.createElement("div");
     splash.className = "mega-splash";
-    splash.style.left = x + "%";
-    splash.style.bottom = y + "%";
+    splash.style.left = plotPct(x) + "%";
+    splash.style.bottom = plotPct(y) + "%";
     container.appendChild(splash);
     setTimeout(() => splash.remove(), 1200);
 }
 
+// Inset the plotting area so dots near the 0%/100% edges keep a margin and
+// don't spill off the chart (notably the lower-right corner in portrait).
+const PLOT_PAD = 3.5;
+const PLOT_SPAN = 100 - 2 * PLOT_PAD;
+function plotPct(v) {
+    const c = Math.max(0, Math.min(100, v));
+    return PLOT_PAD + (c / 100) * PLOT_SPAN;
+}
+function unplotPct(p) {
+    return ((p - PLOT_PAD) / PLOT_SPAN) * 100;
+}
 function updateElementPosition(element, x, y) {
-    element.style.left = x + "%";
-    element.style.bottom = y + "%";
+    element.dataset.realX = x;
+    element.dataset.realY = y;
+    element.style.left = plotPct(x) + "%";
+    element.style.bottom = plotPct(y) + "%";
 }
 function updateDotColor(dot, y) {
     dot.classList.remove("ready-high", "ready-mid", "ready-low");

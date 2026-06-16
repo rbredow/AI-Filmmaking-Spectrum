@@ -50,6 +50,21 @@ let svgLayer = null;
 let renderedItems = new Set();
 let viewMode = "2D"; // Default to 2D View
 const ADMIN_EMAIL = "rob.bredow@gmail.com";
+
+// Escape user-supplied text before interpolating into innerHTML.
+// Tool names, descriptions, tags, and voter usernames are untrusted input
+// that gets broadcast to every other client, so they must never be treated
+// as markup (prevents stored XSS).
+function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+    }[ch]));
+}
+
 let userDisplayName = "";
 let hasConfirmedName = false;
 const FADE_TIME = 5000; // 5 seconds
@@ -1001,11 +1016,11 @@ function createItemElements(container, item) {
 
     // NEW TOOLTIP STRUCTURE
     let html = `
-        <div style="margin-bottom:2px;"><strong>${item.name}</strong></div>
+        <div style="margin-bottom:2px;"><strong>${escapeHtml(item.name)}</strong></div>
         <div id="tags-${item.id}" style="font-size:10px; color:#3b82f6; margin-bottom:4px; font-weight:600;">
-            ${item.tags && item.tags.length > 0 ? item.tags.join(', ') : ''}
+            ${item.tags && item.tags.length > 0 ? escapeHtml(item.tags.join(', ')) : ''}
         </div>
-        <div id="desc-${item.id}" style="font-size:11px; color:#aaa; line-height:1.2; margin-bottom:4px;">${item.desc}</div>
+        <div id="desc-${item.id}" style="font-size:11px; color:#aaa; line-height:1.2; margin-bottom:4px;">${escapeHtml(item.desc)}</div>
         <div style="font-size:10px; color:#888;">
             <span style="color:#eee;">Generative: <b id="val-x-${item.id}">${Math.round(item.x)}</b>%</span>
             <span style="margin:0 4px; color:#444;">|</span>
@@ -1487,7 +1502,7 @@ function updateGraphFromData(allVotes, container) {
                     vDot = document.createElement("div");
                     vDot.className = "voter-dot";
                     vDot.id = `voter-dot-${itemId}-${uid}`;
-                    vDot.innerHTML = `<div class="voter-username">${vote.username || "Anon"}</div>`;
+                    vDot.innerHTML = `<div class="voter-username">${escapeHtml(vote.username || "Anon")}</div>`;
                     container.appendChild(vDot);
                 }
 

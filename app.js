@@ -329,12 +329,16 @@ function throttle(func, limit) {
 }
 
 // --- BOOTSTRAP ----------------------------------------------------------
-// Static-first boot: render from the committed snapshot (data/snapshot.json)
-// and only open a live Firebase connection when voting is actually enabled.
-// When the board is frozen (votingEnabled:false) there is nothing to stream,
-// so we skip anonymous sign-in and the three RTDB listeners entirely — the
-// page never touches the live database. The snapshot's own settings flag is
-// the switch; an admin can always force the live path with ?live=1.
+// On load we ask one cheap, read-only question of the LIVE database: "is
+// voting open?" (a single REST GET of /settings, ~tens of bytes, no websocket).
+//   - Voting OPEN  -> go live: anon sign-in + the three RTDB onValue listeners,
+//                     so everyone sees real-time data the moment voting starts,
+//                     with no redeploy needed.
+//   - Voting CLOSED -> render the committed snapshot (data/snapshot.json) once
+//                     and open no further Firebase connection. currentUser stays
+//                     null, which gates off every drag/vote/write path.
+// If the live check can't be reached we fall back to the snapshot's own flag,
+// so a network hiccup never strands us. ?live=1 always forces the live path.
 let isStaticMode = false;
 let staticSnapshot = null;
 
@@ -349,20 +353,31 @@ function ensureDisplayName() {
 }
 
 async function boot() {
-    let snapshot = null;
-    try {
-        const res = await fetch("./data/snapshot.json", { cache: "no-cache" });
-        if (res.ok) snapshot = await res.json();
-    } catch (e) {
-        console.warn("Snapshot unavailable; falling back to live DB.", e);
-    }
-
     const forceLive = new URLSearchParams(window.location.search).has("live");
-    const snapshotWantsLive = snapshot?.settings?.votingEnabled === true;
 
-    // Go live when explicitly forced, when there is no usable snapshot, or when
-    // the snapshot itself reports voting is open. Otherwise serve it frozen.
-    if (forceLive || !snapshot || snapshotWantsLive) {
+    // Fetch the committed snapshot (static data) and the LIVE voting flag in
+    // parallel. The settings read is a single read-only REST GET, not a
+    // websocket, so it's cheap enough to run on every load. Each tolerates its
+    // own failure (-> null) without rejecting the Promise.all.
+    const [snapshot, liveSettings] = await Promise.all([
+        fetch("./data/snapshot.json", { cache: "no-cache" })
+            .then((r) => (r.ok ? r.json() : null))
+            .catch((e) => { console.warn("Snapshot unavailable.", e); return null; }),
+        fetch(firebaseConfig.databaseURL + "/settings.json", { cache: "no-cache" })
+            .then((r) => (r.ok ? r.json() : null))
+            .catch((e) => { console.warn("Live voting-state check failed.", e); return null; }),
+    ]);
+
+    // Prefer the live voting flag. If it couldn't be read, fall back to the
+    // snapshot's own flag so a hiccup never strands us in the wrong mode.
+    const votingOpen =
+        liveSettings != null
+            ? liveSettings.votingEnabled === true
+            : !!(snapshot && snapshot.settings && snapshot.settings.votingEnabled);
+
+    // Go live when forced, when voting is open, or when there is no snapshot to
+    // fall back on. Otherwise serve the committed snapshot frozen.
+    if (forceLive || votingOpen || !snapshot) {
         startLive();
     } else {
         startStatic(snapshot);

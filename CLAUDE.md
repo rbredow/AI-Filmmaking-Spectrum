@@ -25,24 +25,37 @@ modules + Firebase Realtime Database (RTDB), served as static files.
   local dev session reads/writes real data shared with everyone. Don't run
   destructive flows (master reset, clear votes) casually.
 - **Snapshot:** `npm run snapshot` (scripts/snapshot.mjs) captures the live RTDB
-  into `data/snapshot.json` for safekeeping and to drive static-first boot.
+  into `data/snapshot.json` for safekeeping and to render the closed-voting
+  (static) view.
 
-## Static-first boot (no DB ping when voting is off)
+## Boot: live when voting is open, snapshot when it's closed
 
-`boot()` (app.js, top) fetches `data/snapshot.json` and branches:
-- **Static mode** — when the snapshot's `settings.votingEnabled` is false: render
-  the snapshot once and open **no** Firebase connection (no anon sign-in, no
-  `onValue`, no RTDB websocket). `currentUser` stays null, which gates off every
-  drag/vote/write path. (Google Analytics still loads — that's not the DB.)
-- **Live mode** — when the snapshot says voting is open, the snapshot is
-  missing/unreadable, OR the URL has `?live=1`: the normal path runs (anon auth +
-  the three `onValue` listeners). **Admins must use `?live=1`** to get admin UI
-  and writes; the in-app admin login reloads into `?live=1` automatically.
+`boot()` (app.js, top) makes ONE read-only REST GET of the live `/settings`
+("is voting open?") and branches:
+- **Live mode** — voting is open (or `?live=1`, or the live check failed but the
+  snapshot's flag says open): the normal path runs (anon sign-in + the three
+  `onValue` listeners on items/votes/settings). So **flipping voting on in the
+  admin panel takes effect for new visitors immediately — no redeploy needed.**
+- **Static mode** — voting is closed: render `data/snapshot.json` once and open
+  **no** further Firebase connection (no `onValue`, no RTDB websocket).
+  `currentUser` stays null, which gates off every drag/vote/write path.
 
-⚠️ The committed `data/snapshot.json` is the source of truth for static mode. When
-you change voting state or want fresh data live on the site, **re-run
-`npm run snapshot` and commit** — otherwise the deployed page serves stale frozen
-data. Live mode reads RTDB directly and ignores the snapshot contents.
+Notes:
+- The `/settings` REST read is world-readable + CORS-enabled, so it's a cheap
+  (~tens of bytes) check on every load — NOT a websocket. The snapshot fetch and
+  this settings check run in parallel.
+- `?live=1` always forces live; admins use it for admin UI + writes, and the
+  in-app admin login reloads into `?live=1`.
+- Google Analytics still loads in both modes — that's not the DB. Firebase Auth
+  may also do one `accounts:lookup` to refresh a *persisted* anon session from a
+  prior live visit; it does NOT set `currentUser` in static mode, so writes stay
+  gated.
+
+⚠️ The committed `data/snapshot.json` is what static (voting-closed) visitors see.
+It no longer gates live mode — only the closed-state display. After you **close**
+a voting session, **re-run `npm run snapshot` and commit** to freeze the final
+tally into the static view; otherwise closed-state visitors see the last
+committed snapshot, not the latest results.
 
 ### Doing UI work? Read this first
 
@@ -63,7 +76,7 @@ data. Live mode reads RTDB directly and ignores the snapshot contents.
 Render is driven (live mode) by RTDB listeners in `initApp()` (app.js:495):
 `onValue` on `items`, `votes`, `settings` → the `applyItems`/`applyVotes`/
 `applySettings` functions → re-render. Static mode calls those same apply
-functions once from the snapshot (see "Static-first boot" above).
+functions once from the snapshot (see "Boot" above).
 - `createItemElements()` (app.js:1070) — builds each tool's dot + **tooltip**
   (first render, uses `innerHTML`).
 - `updateItemMetadata()` (app.js:1215) — live updates; uses `innerText` (safe).

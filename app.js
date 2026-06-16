@@ -1095,6 +1095,11 @@ function createItemElements(container, item) {
     updateElementPosition(avgDot, item.x, item.y);
     updateDotColor(avgDot, item.y);
 
+    const numBadge = document.createElement("span");
+    numBadge.className = "dot-number";
+    numBadge.id = `dotnum-${item.id}`;
+    avgDot.appendChild(numBadge);
+
     const label = document.createElement("div");
     label.className = "dot-label";
     label.innerText = item.name;
@@ -1242,7 +1247,8 @@ function renderToolPanel() {
     // Clear existing rows first (handles item additions/removals in live mode).
     panelInner.innerHTML = "";
 
-    items.forEach((item) => {
+    items.forEach((item, index) => {
+        const number = index + 1;
         // Read consensus position from DOM if available (works in both modes)
         const dot = document.getElementById(`dot-${item.id}`);
         const xVal = dot && dot.style.left ? Math.round(parseFloat(dot.style.left)) : Math.round(item.x || 0);
@@ -1259,7 +1265,10 @@ function renderToolPanel() {
 
         // Row HTML — all user fields escaped
         row.innerHTML = `
-            <div class="panel-row-name"></div>
+            <div class="panel-row-head">
+                <span class="panel-row-num">${number}</span>
+                <div class="panel-row-name"></div>
+            </div>
             <div class="panel-metrics">
                 <div class="panel-metric">
                     <div class="panel-metric-label">Generative</div>
@@ -1298,6 +1307,10 @@ function renderToolPanel() {
         });
 
         panelInner.appendChild(row);
+
+        // Keep the on-graph dot number in sync with this row's number
+        const dotNum = document.getElementById(`dotnum-${item.id}`);
+        if (dotNum) dotNum.textContent = number;
     });
 }
 
@@ -1983,6 +1996,10 @@ const BASE_ALONG = 10; // fixed distance along the 45° axis
 const FONT_HEIGHT = 10; // perpendicular thickness of text at 45° (~13px font * cos45)
 
 function resolveAllLabelOverlaps() {
+    // Labels are now revealed on demand (hover/tap/search) as a horizontal pill,
+    // so the old always-on 45° de-overlap pass is disabled.
+    return;
+    /* eslint-disable no-unreachable */
     const container = document.getElementById("graph-container");
     if (!container) return;
     const cW = container.clientWidth;
@@ -2163,3 +2180,22 @@ if (disclaimerModal && !localStorage.getItem("disclaimer_seen")) {
 } else {
     // Already seen
 }
+
+// --- SETTINGS POPUP (portrait header: voter/privacy/contact) ---
+window.toggleSettingsMenu = function (e) {
+    if (e) e.stopPropagation();
+    const header = document.getElementById("header");
+    if (header) header.classList.toggle("settings-open");
+};
+
+document.addEventListener("click", (e) => {
+    const header = document.getElementById("header");
+    if (!header || !header.classList.contains("settings-open")) return;
+    // The toggle button manages its own open/close
+    if (e.target.closest("#settings-toggle")) return;
+    // Clicks on empty menu chrome keep it open; links / username close it
+    const inMenu = e.target.closest("#header-meta");
+    const isAction = e.target.closest("a") || e.target.closest("#user-display");
+    if (inMenu && !isAction) return;
+    header.classList.remove("settings-open");
+});

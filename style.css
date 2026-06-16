@@ -56,10 +56,24 @@ p {
     position: relative;
 }
 
-#user-display {
+#header-meta {
     position: absolute;
     top: 0;
     right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+#settings-toggle {
+    display: none;
+}
+
+#user-display {
+    position: relative;
+    top: auto;
+    right: auto;
     font-size: var(--fs-sm);
     color: #888;
     background: #1a1a1a;
@@ -148,11 +162,40 @@ p {
     padding-left: 11px;
 }
 
+.panel-row-head {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 6px;
+}
+
+.panel-row-num {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #1c1c1c;
+    border: 1px solid #383838;
+    color: #999;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.panel-row.row-active .panel-row-num {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    color: #fff;
+}
+
 .panel-row-name {
     font-size: var(--fs-lg);
     font-weight: 600;
     color: #eee;
-    margin-bottom: 6px;
+    margin-bottom: 0;
     line-height: 1.2;
 }
 
@@ -176,10 +219,11 @@ p {
 .panel-metric-label {
     font-size: var(--fs-xs);
     color: #666;
-    width: 68px;
+    width: 82px;
     flex-shrink: 0;
     text-transform: uppercase;
     letter-spacing: 0.3px;
+    white-space: nowrap;
 }
 
 .panel-metric-bar-wrap {
@@ -699,14 +743,17 @@ p {
 /* --- CONSENSUS DOT (The Average) --- */
 .dot {
     position: absolute;
-    width: 14px;
-    height: 14px;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
     cursor: grab;
     transform: translate(-50%, 50%);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.8);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
     z-index: 10;
-    border: 2px solid #fff;
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition:
         bottom 3s ease-in-out,
         transform 0.2s,
@@ -717,6 +764,18 @@ p {
     -webkit-user-select: none;
     user-select: none;
     touch-action: none;
+}
+
+/* Persistent identity number rendered inside each consensus dot. */
+.dot-number {
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    color: #0a0a0a;
+    line-height: 1;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    font-variant-numeric: tabular-nums;
 }
 
 /* Invisible touch target expansion */
@@ -869,33 +928,51 @@ p {
     transition: none !important;
 }
 
-/* --- LABELS --- */
+/* --- LABELS (name pill, revealed on hover/tap/search) --- */
 .dot-label {
     position: absolute;
+    bottom: calc(100% + 7px);
+    left: 50%;
+    transform: translateX(-50%);
     white-space: nowrap;
     font-size: var(--fs-xs);
-    color: #bbb;
-    font-weight: 400;
+    color: #fff;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    background: rgba(12, 12, 12, 0.95);
+    border: 1px solid #3a3a3a;
+    padding: 3px 8px;
+    border-radius: 5px;
     pointer-events: none;
-    letter-spacing: 0.5px;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 1);
-    z-index: -1;
-    /* Transition position smoothly but NOT transform — overlap adjustment
-       should be instant so labels don't appear to drift from their dots */
-    transition: left 3s ease-in-out, bottom 3s ease-in-out, opacity 0.5s;
+    opacity: 0;
+    z-index: 300;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+    transition: opacity 0.15s;
+}
+
+.dot-label::after {
+    content: "";
+    position: absolute;
+    top: 100%;
     left: 50%;
-    top: 50%;
-    transform-origin: left center;
-    transform: rotate(45deg) translate(10px, 0);
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: rgba(12, 12, 12, 0.95);
+}
+
+/* Reveal the name pill: panel-row hover/tap highlight + search matches */
+.dot.highlighted .dot-label,
+.label-highlighted,
+.searching .dot.search-match .dot-label {
+    opacity: 1;
 }
 
 .label-below {
-    /* default — JS will override with calculated offset */
+    /* no-op (kept for backwards compat) */
 }
 
-/* label-above kept as no-op for backwards compat */
 .label-above {
-    /* default — JS will override with calculated offset */
+    /* no-op (kept for backwards compat) */
 }
 
 /* Tooltip */
@@ -1149,9 +1226,9 @@ button:active {
     opacity: 0;
 }
 
-/* 1D MODE: FORCE ALL LABELS TO POINT DOWN-RIGHT */
+/* 1D MODE: keep the name pill centred above the dot (no rotation) */
 .mode-1d .dot-label {
-    transform: rotate(45deg) translate(15px, 0) !important;
+    transform: translateX(-50%) !important;
 }
 
 /* ========================================= */
@@ -1215,6 +1292,7 @@ button:active {
         background: #0a0a0a;
         flex-shrink: 0;
         border-bottom: 1px solid #222;
+        position: relative;
     }
 
     #header h2 {
@@ -1236,6 +1314,60 @@ button:active {
         padding: 3px 8px;
     }
 
+    /* Collapse account + info links into a ⚙ popup to save header space */
+    #settings-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        flex-shrink: 0;
+        border-radius: 8px;
+        background: #1a1a1a;
+        border: 1px solid #333;
+        color: #ccc;
+        font-size: 17px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0;
+    }
+
+    #settings-toggle:active {
+        background: #262626;
+    }
+
+    #header-meta {
+        position: absolute;
+        top: calc(100% + 6px);
+        right: 10px;
+        left: auto;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        min-width: 180px;
+        padding: 12px 14px;
+        background: #141414;
+        border: 1px solid #333;
+        border-radius: 12px;
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65);
+        z-index: 1500;
+        display: none;
+    }
+
+    #header.settings-open #header-meta {
+        display: flex;
+    }
+
+    #header-meta #user-display {
+        align-self: flex-start;
+    }
+
+    #header-meta .header-link {
+        font-size: var(--fs-sm);
+        color: #aaa;
+        padding: 2px 0;
+    }
+
     /* Stack the layout vertically; it fills all space under the header */
     #main-layout {
         flex-direction: column;
@@ -1247,28 +1379,32 @@ button:active {
         gap: 0;
     }
 
-    /* Graph occupies a fixed slice (~48% of viewport); does NOT grow */
+    /* Graph: smaller plot; a reserved toolbar band sits above it (the auto top
+       margin pushes the graph+panel down, leaving a clean strip under the header
+       for the controls so dots never collide with them). */
     #graph-container {
         width: 100%;
         min-width: 0;
-        flex: 0 0 48vh; /* fallback for older Safari */
-        flex: 0 0 48dvh;
-        height: 48vh; /* fallback for older Safari */
-        height: 48dvh;
+        flex: 0 0 50vh; /* fallback for older Safari */
+        flex: 0 0 50dvh;
+        height: 50vh; /* fallback for older Safari */
+        height: 50dvh;
         min-height: 0;
-        margin: 0;
+        margin: auto 0 0 0;
         border: none;
         border-radius: 0;
         /* Allow dots to visually overflow their clip box when highlighted */
         overflow: visible;
     }
 
-    /* Tool panel takes the remaining space and scrolls INTERNALLY */
+    /* Tool panel: fixed one-third of the viewport; scrolls internally */
     #tool-panel {
         width: 100%;
-        flex: 1 1 0;
+        flex: 0 0 33vh; /* fallback for older Safari */
+        flex: 0 0 33dvh;
+        height: 33vh; /* fallback for older Safari */
+        height: 33dvh;
         min-height: 0;
-        height: auto;
         border-left: none;
         border-top: 1px solid #222;
         overflow-y: auto;
@@ -1315,8 +1451,8 @@ button:active {
 
     /* Larger touch targets for dots */
     .dot {
-        width: 18px;
-        height: 18px;
+        width: 26px;
+        height: 26px;
     }
 
     .dot::before {
@@ -1345,13 +1481,14 @@ button:active {
 
     /* Highlighted dot — slightly bigger on touch */
     .dot.highlighted {
-        width: 32px;
-        height: 32px;
+        width: 36px;
+        height: 36px;
     }
 
-    /* Labels — hidden on portrait mobile (cramped); revealed by highlight */
+    /* Name pill stays hidden until a dot is tapped/highlighted or searched
+       (the reveal rules above override this) */
     .dot-label {
-        display: none;
+        opacity: 0;
     }
 
     /* Tooltips — show inline above dot on tap (not bottom-sheet) */
@@ -1382,12 +1519,19 @@ button:active {
     /* Controls: one tidy wrapping row pinned at the top of the graph */
     #top-right-controls {
         position: absolute;
-        top: 8px;
+        top: -38px;
         left: 8px;
         right: 8px;
         flex-wrap: wrap;
         justify-content: flex-end;
         gap: 6px;
+    }
+
+    /* Controls use the smallest type token on mobile */
+    #branch-filter-btn,
+    #view-mode-btn,
+    #search-input {
+        font-size: var(--fs-xs);
     }
 
     #search-container,
@@ -1408,7 +1552,7 @@ button:active {
 
     #search-input {
         width: 60px;
-        font-size: var(--fs-sm);
+        font-size: var(--fs-xs);
     }
 
     #search-input:focus {
@@ -1428,9 +1572,9 @@ button:active {
         line-height: 1;
     }
 
-    /* Keep the "Ready" y-axis label clear of the controls row */
+    /* Toolbar now sits ABOVE the plot, so the "Ready" label returns to the top */
     .y-label-top {
-        top: 56px;
+        top: 8px;
     }
 
     /* Admin controls */
@@ -1614,9 +1758,9 @@ button:active {
         -webkit-overflow-scrolling: touch;
     }
 
-    /* Tap-to-label: hide always-on labels in small landscape */
+    /* Tap-to-label: name pill hidden until highlight/search reveals it */
     .dot-label {
-        display: none;
+        opacity: 0;
     }
 
     .tooltip {

@@ -87,6 +87,67 @@ functions once from the snapshot (see "Boot" above).
   Fiddly geometry; change carefully and eyeball the result.
 - **View modes:** 2D (X/Y) and 1D (X only); ~3s animated transition.
 
+## Interface layout — graph + tool-detail panel (desktop & mobile)
+
+The page is `#header` above `#main-layout`, a flex container holding two
+siblings: `#graph-container` (the scatter) and `#tool-panel` (a scrollable list
+of every tool). **Put nothing new INSIDE `#graph-container` in index.html** —
+`initApp()` rebuilds that element's inner scaffold via `container.innerHTML`
+(~app.js:529, the axis labels + `#top-right-controls`), wiping static children.
+The panel lives OUTSIDE the graph for this reason.
+
+- **Wide (desktop/landscape):** `#main-layout` is a row — graph (flex-grow) on
+  the left, `#tool-panel` (~340px) on the right, each its own height.
+- **Portrait (`max-width:600px`):** `#main-layout` is a column — graph pinned to
+  the top (~48dvh), panel fills the rest. On mobile, `html,body` are
+  `height:100dvh; overflow:hidden` so **the body never scrolls — only
+  `#tool-panel` scrolls internally** (`overflow-y:auto`, `min-height:0`). This is
+  deliberate: tapping a dot must scroll the panel while the graph stays put.
+
+**Panel rows** are built by `renderToolPanel()` (module scope), called at the end
+of `applyItems`. Each row is `#panel-row-<id>` with `data-item-id`, showing name,
+two metric bars (Generative=x, Readiness=y) + %, description, and tag chips. Live
+consensus updates the bars/numbers inside `updateGraphFromData` (ids
+`bar-gen-<id>` / `bar-ready-<id>` / `num-*`) — it does NOT rebuild the list.
+
+**Readiness bar color** is a SOLID color from the value via `readinessColor(y)`
+(near `updateDotColor`), interpolating the same spectrum as the y-axis
+(0% `#ff3d00` red → 50% `#ffea00` yellow → 100% `#00e676` green). Set inline as
+`background-color`; the `.panel-metric-bar-ready` CSS must stay gradient-free or
+it paints over. Generative bar stays blue. If you add a gradient back, the solid
+color breaks.
+
+**Highlight (bidirectional locator)** — `highlightItem(id)` / `clearHighlight()`
+(module scope) add `.highlighted` to `dot-<id>` and `.row-active` to its row.
+Hovering a panel row (desktop `mouseenter`) or tapping/clicking a dot highlights;
+tapping a dot ALSO `scrollIntoView({behavior:'smooth', block:'center'})` on its
+row so you watch the list fly to it. The tap path is `setupTapTooltip()`
+(touchend) + a desktop `click` handler on each dot.
+- ⚠️ The highlight must enlarge the dot via **width/height + box-shadow ring,
+  NOT `transform: scale()`**. The `.dot-label` is a child of the dot, so a scale
+  transform balloons the rotated label (a fixed + reverted regression). Keep
+  `.dot.highlighted { transform: translate(-50%,50%) }` (base centering only).
+
+**Typography — one 5-step token scale.** All font sizes come from `:root` vars in
+`style.css`: `--fs-xs:12 / --fs-sm:14 / --fs-base:16 / --fs-lg:18 / --fs-xl:24`
+(px). Rules:
+- Use a token for every `font-size`; **no raw px/rem and no inline `font-size`**
+  (the only exception is the `#add-item-btn { font-size:0 }` + `::before
+  { font-size:20px }` "+" icon glyph hack). Don't reintroduce inline sizes in
+  modals/tooltips.
+- **12px is the floor** — nothing readable smaller (axis labels included; they
+  used to drop to 6–8px on mobile).
+- Roles: `xl`=page title (desktop; `lg` on mobile); `lg`=tool/section names
+  (panel row name, tooltip title, modal h3); `base`=inputs/buttons/tooltip body;
+  `sm`=descriptions, %, voter chip, header links; `xs`=axis labels, tags, metric
+  mini-labels, dot labels.
+- One font family (Segoe UI stack); weights 400/600/700.
+
+For UI verification, drive the browser via chrome-devtools MCP at 1440×900
+(desktop), 390×844 (portrait), 844×390 (landscape). Static mode (`localhost:8000`)
+renders the real 32 items, so layout/fonts/panel match live with zero prod-DB
+writes.
+
 ## Data model (RTDB paths)
 
 - `/items/{id}` — `{ name, desc, x, y, tags[], createdBy }`. World-readable.

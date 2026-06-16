@@ -695,6 +695,8 @@ function initApp() {
         }
         // After items are created/updated, schedule label de-overlap
         scheduleResolveLabels();
+        // Render / refresh the tool panel list
+        renderToolPanel();
     }
 
     function applyVotes(data) {
@@ -756,6 +758,10 @@ function setupGlobalTouchHandlers() {
 
         if (!e.target.closest(".dot") && !e.target.closest(".tooltip")) {
             closeAllTooltips();
+        }
+        // Clear highlight when clicking outside dots, tooltips, and panel rows
+        if (!e.target.closest(".dot") && !e.target.closest(".tooltip") && !e.target.closest(".panel-row")) {
+            clearHighlight();
         }
     });
 
@@ -1103,11 +1109,11 @@ function createItemElements(container, item) {
     // NEW TOOLTIP STRUCTURE
     let html = `
         <div style="margin-bottom:2px;"><strong>${escapeHtml(item.name)}</strong></div>
-        <div id="tags-${item.id}" style="font-size:10px; color:#3b82f6; margin-bottom:4px; font-weight:600;">
+        <div id="tags-${item.id}" style="font-size:var(--fs-xs); color:#3b82f6; margin-bottom:4px; font-weight:600;">
             ${item.tags && item.tags.length > 0 ? escapeHtml(item.tags.join(', ')) : ''}
         </div>
-        <div id="desc-${item.id}" style="font-size:11px; color:#aaa; line-height:1.2; margin-bottom:4px;">${escapeHtml(item.desc)}</div>
-        <div style="font-size:10px; color:#888;">
+        <div id="desc-${item.id}" style="font-size:var(--fs-xs); color:#aaa; line-height:1.2; margin-bottom:4px;">${escapeHtml(item.desc)}</div>
+        <div style="font-size:var(--fs-xs); color:#888;">
             <span style="color:#eee;">Generative: <b id="val-x-${item.id}">${Math.round(item.x)}</b>%</span>
             <span style="margin:0 4px; color:#444;">|</span>
             <span style="color:#eee;">Readiness: <b id="val-y-${item.id}">${Math.round(item.y)}</b>%</span>
@@ -1184,6 +1190,117 @@ function createItemElements(container, item) {
     setupTapTooltip(avgDot, item);
 }
 
+// --- HIGHLIGHT HELPERS (bidirectional: dot <-> panel row) ---
+let _currentHighlightId = null;
+
+function highlightItem(id) {
+    // Clear the previous highlight
+    clearHighlight();
+    _currentHighlightId = id;
+
+    // Highlight the dot via class only — size/ring done in CSS via width/height + box-shadow,
+    // NOT transform scale (which would balloon the child .dot-label).
+    const dot = document.getElementById(`dot-${id}`);
+    if (dot) {
+        dot.classList.add("highlighted");
+    }
+
+    // Make label visible even on mobile
+    const label = document.getElementById(`label-${id}`);
+    if (label) label.classList.add("label-highlighted");
+
+    // Highlight the panel row
+    const row = document.getElementById(`panel-row-${id}`);
+    if (row) row.classList.add("row-active");
+}
+
+function clearHighlight() {
+    if (_currentHighlightId) {
+        const dot = document.getElementById(`dot-${_currentHighlightId}`);
+        if (dot) {
+            dot.classList.remove("highlighted");
+        }
+        const label = document.getElementById(`label-${_currentHighlightId}`);
+        if (label) label.classList.remove("label-highlighted");
+        const row = document.getElementById(`panel-row-${_currentHighlightId}`);
+        if (row) row.classList.remove("row-active");
+        _currentHighlightId = null;
+    }
+}
+
+// --- TOOL PANEL RENDER ---
+function renderToolPanel() {
+    const panelInner = document.getElementById("tool-panel-inner");
+    if (!panelInner) return;
+
+    // Sort items by name for a readable list
+    const items = Object.values(itemsCache).sort((a, b) =>
+        (a.name || "").localeCompare(b.name || "")
+    );
+
+    // Build rows once. We'll update metric bars/numbers via updateGraphFromData.
+    // Clear existing rows first (handles item additions/removals in live mode).
+    panelInner.innerHTML = "";
+
+    items.forEach((item) => {
+        // Read consensus position from DOM if available (works in both modes)
+        const dot = document.getElementById(`dot-${item.id}`);
+        const xVal = dot && dot.style.left ? Math.round(parseFloat(dot.style.left)) : Math.round(item.x || 0);
+        const yVal = dot && dot.style.bottom ? Math.round(parseFloat(dot.style.bottom)) : Math.round(item.y || 0);
+
+        const row = document.createElement("div");
+        row.className = "panel-row";
+        row.id = `panel-row-${item.id}`;
+        row.dataset.itemId = item.id;
+
+        // Tags as chips - built safely via textContent after creation
+        const tagsArr = (item.tags && item.tags.length > 0) ? item.tags : [];
+        const tagsHtml = tagsArr.map(t => `<span class="panel-tag">${escapeHtml(t)}</span>`).join("");
+
+        // Row HTML — all user fields escaped
+        row.innerHTML = `
+            <div class="panel-row-name"></div>
+            <div class="panel-metrics">
+                <div class="panel-metric">
+                    <div class="panel-metric-label">Generative</div>
+                    <div class="panel-metric-bar-wrap">
+                        <div class="panel-metric-bar panel-metric-bar-gen" id="bar-gen-${item.id}" style="width:${xVal}%"></div>
+                    </div>
+                    <div class="panel-metric-num" id="num-gen-${item.id}">${xVal}%</div>
+                </div>
+                <div class="panel-metric">
+                    <div class="panel-metric-label">Readiness</div>
+                    <div class="panel-metric-bar-wrap">
+                        <div class="panel-metric-bar panel-metric-bar-ready" id="bar-ready-${item.id}" style="width:${yVal}%; background-color:${readinessColor(yVal)}"></div>
+                    </div>
+                    <div class="panel-metric-num" id="num-ready-${item.id}">${yVal}%</div>
+                </div>
+            </div>
+            <div class="panel-row-desc"></div>
+            <div class="panel-row-tags">${tagsHtml}</div>
+        `;
+
+        // Set name and desc via textContent (XSS-safe, no escaping needed)
+        row.querySelector(".panel-row-name").textContent = item.name || "";
+        row.querySelector(".panel-row-desc").textContent = item.desc || "";
+
+        // Panel -> Dot: mouseenter highlights dot; click/tap also highlights
+        row.addEventListener("mouseenter", () => {
+            highlightItem(item.id);
+        });
+        row.addEventListener("mouseleave", () => {
+            // Only clear on mouseleave for hover; keep for tap (handled separately)
+            if (_currentHighlightId === item.id) clearHighlight();
+        });
+        row.addEventListener("click", () => {
+            // Tap: keep highlight until another is chosen
+            highlightItem(item.id);
+        });
+
+        panelInner.appendChild(row);
+    });
+}
+
 // --- TAP-TO-SHOW TOOLTIP FOR TOUCH DEVICES ---
 function setupTapTooltip(avgDot, item) {
     let tapStartTime = 0;
@@ -1208,7 +1325,7 @@ function setupTapTooltip(avgDot, item) {
         const moveX = Math.abs(touch.clientX - tapStartX);
         const moveY = Math.abs(touch.clientY - tapStartY);
 
-        // If it was a quick tap without much movement, toggle tooltip
+        // If it was a quick tap without much movement, scroll panel + highlight
         if (
             tapDuration < TAP_THRESHOLD &&
             moveX < MOVE_THRESHOLD &&
@@ -1217,13 +1334,33 @@ function setupTapTooltip(avgDot, item) {
             // Don't toggle if we just finished dragging
             if (!isDragging) {
                 e.preventDefault();
-                // Close other tooltips
-                document.querySelectorAll(".dot.tooltip-active").forEach((d) => {
-                    if (d !== avgDot) d.classList.remove("tooltip-active");
-                });
-                avgDot.classList.toggle("tooltip-active");
+                // Scroll panel row into view and highlight
+                const row = document.getElementById(`panel-row-${item.id}`);
+                if (row) {
+                    row.scrollIntoView({ behavior: "smooth", block: "center" });
+                }
+                highlightItem(item.id);
+                // On wider screens also show the anchored tooltip
+                if (window.innerWidth > 600) {
+                    document
+                        .querySelectorAll(".dot.tooltip-active")
+                        .forEach((d) => {
+                            if (d !== avgDot) d.classList.remove("tooltip-active");
+                        });
+                    avgDot.classList.toggle("tooltip-active");
+                }
             }
         }
+    });
+
+    // Desktop click also scrolls+highlights panel
+    avgDot.addEventListener("click", (e) => {
+        if (isTouchDevice()) return; // handled by touchend
+        const row = document.getElementById(`panel-row-${item.id}`);
+        if (row) {
+            row.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        highlightItem(item.id);
     });
 }
 
@@ -1672,6 +1809,19 @@ function updateGraphFromData(allVotes, container) {
             if (valX) valX.innerText = Math.round(avgX);
             if (valY) valY.innerText = Math.round(avgY);
 
+            // UPDATE PANEL ROW METRICS (bars + numbers)
+            const barGen = document.getElementById(`bar-gen-${itemId}`);
+            const barReady = document.getElementById(`bar-ready-${itemId}`);
+            const numGen = document.getElementById(`num-gen-${itemId}`);
+            const numReady = document.getElementById(`num-ready-${itemId}`);
+            if (barGen) barGen.style.width = Math.round(avgX) + "%";
+            if (barReady) {
+                barReady.style.width = Math.round(avgY) + "%";
+                barReady.style.backgroundColor = readinessColor(avgY);
+            }
+            if (numGen) numGen.textContent = Math.round(avgX) + "%";
+            if (numReady) numReady.textContent = Math.round(avgY) + "%";
+
             const myVoteDiv = document.getElementById(`my-vote-${itemId}`);
             if (myVoteDiv) {
                 if (myVote) {
@@ -1787,6 +1937,26 @@ function updateDotColor(dot, y) {
     if (y > 80) dot.classList.add("ready-high");
     else if (y > 50) dot.classList.add("ready-mid");
     else dot.classList.add("ready-low");
+}
+
+// Solid color for a readiness value, interpolated along the same spectrum as
+// the y-axis gradient: 0% red → 50% yellow → 100% green.
+// (#ff3d00 → #ffea00 → #00e676)
+function readinessColor(y) {
+    const v = Math.max(0, Math.min(100, y));
+    const lerp = (a, b, t) => Math.round(a + (b - a) * t);
+    const red = [255, 61, 0];
+    const yellow = [255, 234, 0];
+    const green = [0, 230, 118];
+    let c;
+    if (v <= 50) {
+        const t = v / 50;
+        c = [lerp(red[0], yellow[0], t), lerp(red[1], yellow[1], t), lerp(red[2], yellow[2], t)];
+    } else {
+        const t = (v - 50) / 50;
+        c = [lerp(yellow[0], green[0], t), lerp(yellow[1], green[1], t), lerp(yellow[2], green[2], t)];
+    }
+    return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
 }
 function updateLabelPosition(labelElement, y) {
     // Initial class — will be refined by resolveAllLabelOverlaps

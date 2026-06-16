@@ -1,3 +1,14 @@
+/* ========================================= */
+/*         TYPE SCALE CSS VARIABLES         */
+/* ========================================= */
+:root {
+    --fs-xs:   12px;  /* floor — nothing readable smaller */
+    --fs-sm:   14px;
+    --fs-base: 16px;
+    --fs-lg:   18px;
+    --fs-xl:   24px;
+}
+
 body.initial-load *,
 body.initial-load *::before,
 body.initial-load *::after {
@@ -28,11 +39,12 @@ h2 {
     letter-spacing: 1px;
     color: #fff;
     margin-top: 0;
+    font-size: var(--fs-xl);
 }
 
 p {
     color: #666;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     margin-bottom: 0;
 }
 
@@ -48,7 +60,7 @@ p {
     position: absolute;
     top: 0;
     right: 0;
-    font-size: 11px;
+    font-size: var(--fs-sm);
     color: #888;
     background: #1a1a1a;
     padding: 4px 10px;
@@ -68,19 +80,191 @@ p {
 
 #user-display span {
     color: #3b82f6;
-    font-weight: bold;
+    font-weight: 700;
+}
+
+/* ========================================= */
+/*              MAIN LAYOUT                  */
+/* ========================================= */
+#main-layout {
+    display: flex;
+    flex-direction: row;
+    width: 90%;
+    max-width: 1400px;
+    height: calc(100vh - 200px);
+    min-height: 350px;
+    gap: 0;
+    margin-bottom: 40px;
 }
 
 #graph-container {
     position: relative;
-    width: 90%;
-    max-width: 1400px;
-    height: calc(100vh - 250px);
-    min-height: 350px;
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100%;
     border-bottom: 1px solid #666;
     background: linear-gradient(to bottom, #111 0%, #050505 100%);
-    margin-bottom: 40px;
     transition: background 3s;
+}
+
+/* ========================================= */
+/*              TOOL PANEL                   */
+/* ========================================= */
+#tool-panel {
+    width: 340px;
+    flex-shrink: 0;
+    height: 100%;
+    overflow-y: auto;
+    background: #0d0d0d;
+    border-left: 1px solid #222;
+    border-bottom: 1px solid #666;
+    box-sizing: border-box;
+    -webkit-overflow-scrolling: touch;
+}
+
+#tool-panel-inner {
+    padding: 8px 0;
+}
+
+.panel-row {
+    padding: 10px 14px;
+    border-bottom: 1px solid #1a1a1a;
+    cursor: pointer;
+    transition: background 0.15s;
+    position: relative;
+}
+
+.panel-row:last-child {
+    border-bottom: none;
+}
+
+.panel-row:hover {
+    background: #161616;
+}
+
+.panel-row.row-active {
+    background: #1a2438;
+    border-left: 3px solid #3b82f6;
+    padding-left: 11px;
+}
+
+.panel-row-name {
+    font-size: var(--fs-lg);
+    font-weight: 600;
+    color: #eee;
+    margin-bottom: 6px;
+    line-height: 1.2;
+}
+
+.panel-row.row-active .panel-row-name {
+    color: #fff;
+}
+
+.panel-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+
+.panel-metric {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.panel-metric-label {
+    font-size: var(--fs-xs);
+    color: #666;
+    width: 68px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.panel-metric-bar-wrap {
+    flex: 1;
+    height: 5px;
+    background: #222;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.panel-metric-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+}
+
+.panel-metric-bar-gen {
+    background: linear-gradient(to right, #6366f1, #3b82f6);
+}
+
+.panel-metric-bar-ready {
+    /* Solid color set per-value in JS via readinessColor() (red→yellow→green) */
+    background-color: #888;
+}
+
+.panel-metric-num {
+    font-size: var(--fs-sm);
+    color: #aaa;
+    width: 34px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+}
+
+.panel-row.row-active .panel-metric-num {
+    color: #ddd;
+}
+
+.panel-row-desc {
+    font-size: var(--fs-sm);
+    color: #666;
+    line-height: 1.35;
+    margin-bottom: 5px;
+}
+
+.panel-row-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.panel-tag {
+    font-size: var(--fs-xs);
+    color: #3b82f6;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    border-radius: 3px;
+    padding: 1px 5px;
+    line-height: 1.4;
+}
+
+/* ========================================= */
+/*         DOT HIGHLIGHT STATE               */
+/* ========================================= */
+.dot.highlighted {
+    z-index: 200;
+    transform: translate(-50%, 50%);
+    width: 30px;
+    height: 30px;
+    box-shadow: 0 0 0 4px #3b82f6, 0 0 20px rgba(59, 130, 246, 0.8), 0 4px 10px rgba(0,0,0,0.8);
+    border-color: #fff;
+    transition:
+        width 0.15s ease,
+        height 0.15s ease,
+        box-shadow 0.15s ease,
+        bottom 3s ease-in-out,
+        left 0.2s,
+        background-color 3s;
+}
+
+.dot.highlighted .dot-label,
+.label-highlighted {
+    opacity: 1 !important;
+    display: block !important;
+    color: #fff !important;
 }
 
 /* Y-Axis Indicator */
@@ -100,7 +284,7 @@ p {
 .axis-label {
     position: absolute;
     color: #888;
-    font-size: 11px;
+    font-size: var(--fs-xs);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -155,7 +339,7 @@ p {
     position: relative;
     background: #3b82f6;
     color: #fff;
-    font-size: 13px;
+    font-size: var(--fs-base);
     font-weight: 700;
     cursor: pointer;
     height: 34px;
@@ -190,7 +374,7 @@ p {
 
 #branch-filter-btn {
     color: #888;
-    font-size: 13px;
+    font-size: var(--fs-base);
     font-weight: 700;
     cursor: pointer;
     height: 34px;
@@ -231,7 +415,7 @@ p {
     align-items: center;
     gap: 8px;
     margin-bottom: 6px;
-    font-size: 12px;
+    font-size: var(--fs-sm);
     color: #ccc;
     cursor: pointer;
 }
@@ -248,7 +432,7 @@ p {
 #view-mode-btn {
     position: relative;
     color: #888;
-    font-size: 13px;
+    font-size: var(--fs-base);
     font-weight: 700;
     cursor: pointer;
     height: 34px;
@@ -300,8 +484,8 @@ p {
     color: white;
     padding: 8px 12px;
     border-radius: 6px;
-    font-size: 12px;
-    font-weight: bold;
+    font-size: var(--fs-xs);
+    font-weight: 700;
     white-space: nowrap;
     pointer-events: none;
     z-index: 1000;
@@ -341,7 +525,7 @@ p {
     border-radius: 4px;
     cursor: pointer;
     z-index: 1000;
-    font-size: 11px;
+    font-size: var(--fs-xs);
     letter-spacing: 1px;
     text-transform: uppercase;
     transition: all 0.2s;
@@ -377,7 +561,7 @@ p {
     background: transparent;
     border: none;
     color: #eee;
-    font-size: 16px;
+    font-size: var(--fs-base);
     padding: 4px 0;
     width: 80px;
     outline: none;
@@ -389,7 +573,7 @@ p {
 }
 
 #search-icon {
-    font-size: 14px;
+    font-size: var(--fs-sm);
     color: #888;
 }
 
@@ -650,7 +834,7 @@ p {
     bottom: 12px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 9px;
+    font-size: var(--fs-xs);
     color: #3b82f6;
     white-space: nowrap;
     pointer-events: none;
@@ -666,8 +850,8 @@ p {
 
 .user-dot .voter-username {
     color: #fff;
-    font-size: 10px;
-    font-weight: bold;
+    font-size: var(--fs-sm);
+    font-weight: 700;
     bottom: 18px;
     transition:
         opacity 2s ease-in-out,
@@ -689,7 +873,7 @@ p {
 .dot-label {
     position: absolute;
     white-space: nowrap;
-    font-size: 13px;
+    font-size: var(--fs-xs);
     color: #bbb;
     font-weight: 400;
     pointer-events: none;
@@ -728,7 +912,7 @@ p {
     left: 50%;
     transform: translateX(-50%);
     color: #ddd;
-    font-size: 13px;
+    font-size: var(--fs-sm);
     line-height: 1.5;
     pointer-events: none; /* Hidden tooltips must NOT intercept mouse/drag events */
     box-shadow: 0 10px 30px rgba(0, 0, 0, 1);
@@ -754,7 +938,7 @@ p {
     display: block;
     color: #fff;
     margin-bottom: 4px;
-    font-size: 14px;
+    font-size: var(--fs-lg);
 }
 
 /* TOOLTIP TRIGGER - Desktop hover */
@@ -786,7 +970,7 @@ p {
     background: #333;
     border: 1px solid #555;
     color: #ccc;
-    font-size: 10px;
+    font-size: var(--fs-sm);
     padding: 2px 6px;
     border-radius: 3px;
     cursor: pointer;
@@ -842,6 +1026,7 @@ p {
     margin-top: 0;
     color: #fff;
     font-weight: 300;
+    font-size: var(--fs-lg);
 }
 
 .form-group {
@@ -851,7 +1036,7 @@ p {
 .form-group label {
     display: block;
     color: #888;
-    font-size: 12px;
+    font-size: var(--fs-sm);
     margin-bottom: 5px;
 }
 
@@ -863,7 +1048,7 @@ p {
     border: 1px solid #444;
     color: #fff;
     border-radius: 4px;
-    font-size: 16px;
+    font-size: var(--fs-base);
 }
 
 .checkbox-scroll-list {
@@ -884,7 +1069,7 @@ p {
 .slider-labels {
     display: flex;
     justify-content: space-between;
-    font-size: 10px;
+    font-size: var(--fs-sm);
     color: #555;
     text-transform: uppercase;
 }
@@ -903,7 +1088,7 @@ button {
     cursor: pointer;
     background: #333;
     color: #ccc;
-    font-size: 14px;
+    font-size: var(--fs-base);
     min-height: 44px;
     min-width: 44px;
 }
@@ -979,9 +1164,13 @@ button:active {
         padding: 20px 10px;
     }
 
-    #graph-container {
+    #main-layout {
         width: 95%;
-        height: calc(100vh - 200px);
+        height: calc(100vh - 180px);
+    }
+
+    #tool-panel {
+        width: 280px;
     }
 
     .tooltip {
@@ -990,24 +1179,28 @@ button:active {
     }
 
     .axis-label {
-        font-size: 10px;
+        font-size: var(--fs-xs);
     }
 }
 
-/* Mobile - NO SCROLL LAYOUT */
+/* Portrait / narrow mobile: stack graph + panel vertically */
 @media (max-width: 600px) {
 
+    /* Pin the viewport — body must NOT scroll; only #tool-panel scrolls */
     html,
     body {
-        /* Allow scrolling and zooming */
         width: 100%;
-        overflow-x: auto;
+        height: 100vh; /* fallback for older Safari */
+        height: 100dvh;
+        overflow: hidden;
     }
 
     body {
         padding: 0;
         margin: 0;
         justify-content: flex-start;
+        display: flex;
+        flex-direction: column;
     }
 
     #header {
@@ -1025,14 +1218,13 @@ button:active {
     }
 
     #header h2 {
-        font-size: 1rem;
+        font-size: var(--fs-lg);
         margin: 0;
         white-space: nowrap;
     }
 
     #header p {
         display: none;
-        /* Hide subtitle on mobile */
     }
 
     #user-display {
@@ -1040,71 +1232,54 @@ button:active {
         top: auto;
         right: auto;
         margin: 0;
-        font-size: 10px;
+        font-size: var(--fs-xs);
         padding: 3px 8px;
     }
 
+    /* Stack the layout vertically; it fills all space under the header */
+    #main-layout {
+        flex-direction: column;
+        width: 100%;
+        flex: 1 1 auto;
+        min-height: 0;
+        height: auto;
+        margin: 0;
+        gap: 0;
+    }
+
+    /* Graph occupies a fixed slice (~48% of viewport); does NOT grow */
     #graph-container {
         width: 100%;
-        min-width: 800px;
-        height: calc(100dvh - 45px);
-        /* Full height minus header */
-        height: calc(100vh - 45px);
-        /* Fallback */
+        min-width: 0;
+        flex: 0 0 48vh; /* fallback for older Safari */
+        flex: 0 0 48dvh;
+        height: 48vh; /* fallback for older Safari */
+        height: 48dvh;
+        min-height: 0;
         margin: 0;
-        padding-right: 20px;
-        /* buffer for scrolling */
         border: none;
         border-radius: 0;
-        flex-grow: 1;
+        /* Allow dots to visually overflow their clip box when highlighted */
+        overflow: visible;
     }
 
-    /* Controls - overlay inside graph container */
-    #add-item-btn,
-    #view-mode-btn,
-    #search-container {
-        top: 10px;
-        bottom: auto;
-        z-index: 100;
+    /* Tool panel takes the remaining space and scrolls INTERNALLY */
+    #tool-panel {
+        width: 100%;
+        flex: 1 1 0;
+        min-height: 0;
+        height: auto;
+        border-left: none;
+        border-top: 1px solid #222;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
-    #add-item-btn {
-        right: 10px;
-        font-size: 24px;
-        padding: 8px;
-        background: rgba(0, 0, 0, 0.6);
-        border-radius: 8px;
-    }
-
-    #view-mode-btn {
-        right: 55px;
-        font-size: 11px;
-        padding: 6px 10px;
-        line-height: 16px;
-        background: rgba(0, 0, 0, 0.6);
-    }
-
-    #search-container {
-        left: 10px;
-        right: auto;
-        padding: 4px 8px;
-        background: rgba(0, 0, 0, 0.6);
-    }
-
-    #search-input {
-        width: 60px;
-        font-size: 14px;
-    }
-
-    #search-input:focus {
-        width: 100px;
-    }
-
-    /* Axis labels - compact inside graph */
+    /* Axis labels — floored at 12px on mobile */
     .axis-label {
-        font-size: 7px;
+        font-size: var(--fs-xs);
         letter-spacing: 0;
-        opacity: 0.5;
+        opacity: 0.7;
     }
 
     .x-label-left {
@@ -1119,7 +1294,6 @@ button:active {
 
     .y-label-top {
         top: 50px;
-        /* Below controls */
         left: 8px;
     }
 
@@ -1130,7 +1304,7 @@ button:active {
         text-align: left;
     }
 
-    /* Y-axis gradient - inside graph */
+    /* Y-axis gradient */
     .y-axis-gradient {
         left: 3px;
         top: 45px;
@@ -1169,39 +1343,124 @@ button:active {
         height: 5px;
     }
 
-    /* Labels */
+    /* Highlighted dot — slightly bigger on touch */
+    .dot.highlighted {
+        width: 32px;
+        height: 32px;
+    }
+
+    /* Labels — hidden on portrait mobile (cramped); revealed by highlight */
     .dot-label {
-        font-size: 10px;
-    }
-
-    /* Tooltips - bottom sheet */
-    .tooltip {
-        position: fixed !important;
-        bottom: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        top: auto !important;
-        width: 100% !important;
-        max-width: none !important;
-        transform: none !important;
-        border-radius: 16px 16px 0 0;
-        padding: 16px 20px;
-        padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-        z-index: 500;
-        box-sizing: border-box;
-        font-size: 13px;
-        max-height: 40vh;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    .tooltip::after {
         display: none;
     }
 
+    /* Tooltips — show inline above dot on tap (not bottom-sheet) */
+    .tooltip {
+        font-size: var(--fs-xs);
+    }
+
     .tooltip strong {
-        font-size: 15px;
+        font-size: var(--fs-sm);
         margin-bottom: 6px;
+    }
+
+    /* Voter dots */
+    .voter-dot {
+        width: 10px;
+        height: 10px;
+    }
+
+    .voter-username {
+        font-size: var(--fs-xs);
+    }
+
+    .user-dot .voter-username {
+        font-size: var(--fs-xs);
+        bottom: 20px;
+    }
+
+    /* Controls: one tidy wrapping row pinned at the top of the graph */
+    #top-right-controls {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        right: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 6px;
+    }
+
+    #search-container,
+    #branch-filter-container,
+    #view-mode-btn,
+    #add-item-btn {
+        position: relative;
+        top: auto;
+        right: auto;
+        left: auto;
+        bottom: auto;
+    }
+
+    #search-container {
+        background: rgba(0, 0, 0, 0.6);
+        padding: 4px 8px;
+    }
+
+    #search-input {
+        width: 60px;
+        font-size: var(--fs-sm);
+    }
+
+    #search-input:focus {
+        width: 100px;
+    }
+
+    /* Compact the add button to a "+" so controls fit one row */
+    #add-item-btn {
+        font-size: 0;
+        padding: 6px 11px;
+        line-height: 1;
+    }
+
+    #add-item-btn::before {
+        content: "+";
+        font-size: 20px;
+        line-height: 1;
+    }
+
+    /* Keep the "Ready" y-axis label clear of the controls row */
+    .y-label-top {
+        top: 56px;
+    }
+
+    /* Admin controls */
+    .admin-controls {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .admin-btn {
+        padding: 8px 12px;
+        font-size: var(--fs-xs);
+        flex: 1;
+        text-align: center;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Global reset button */
+    #global-reset-btn {
+        position: absolute;
+        top: 10px;
+        bottom: auto;
+        left: auto;
+        right: 100px;
+        font-size: var(--fs-xs);
+        padding: 4px 6px;
+        min-height: 28px;
+        background: rgba(0, 0, 0, 0.6);
     }
 
     /* Modals - bottom sheet style */
@@ -1222,7 +1481,7 @@ button:active {
     }
 
     .modal-content h3 {
-        font-size: 16px;
+        font-size: var(--fs-base);
     }
 
     .form-group input[type="text"] {
@@ -1231,51 +1490,6 @@ button:active {
 
     .form-group input[type="range"] {
         height: 36px;
-    }
-
-    /* Voter dots */
-    .voter-dot {
-        width: 10px;
-        height: 10px;
-    }
-
-    .voter-username {
-        font-size: 7px;
-    }
-
-    .user-dot .voter-username {
-        font-size: 8px;
-        bottom: 20px;
-    }
-
-    /* Admin controls */
-    .admin-controls {
-        flex-wrap: wrap;
-        gap: 6px;
-    }
-
-    .admin-btn {
-        padding: 8px 12px;
-        font-size: 11px;
-        flex: 1;
-        text-align: center;
-        min-height: 40px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    /* Global reset button - move to top */
-    #global-reset-btn {
-        position: absolute;
-        top: 10px;
-        bottom: auto;
-        left: auto;
-        right: 100px;
-        font-size: 7px;
-        padding: 4px 6px;
-        min-height: 28px;
-        background: rgba(0, 0, 0, 0.6);
     }
 
     /* Modal buttons */
@@ -1287,7 +1501,7 @@ button:active {
     .modal-actions button {
         width: 100%;
         padding: 12px;
-        font-size: 15px;
+        font-size: var(--fs-base);
     }
 
     /* Grid lines */
@@ -1303,81 +1517,106 @@ button:active {
 /* Very small screens (iPhone SE, etc) */
 @media (max-width: 380px) {
     #header h2 {
-        font-size: 0.85rem;
+        font-size: var(--fs-lg);
     }
 
     #user-display {
-        font-size: 9px;
+        font-size: var(--fs-xs);
         padding: 2px 6px;
     }
 
     .dot-label {
-        font-size: 8px;
+        font-size: var(--fs-xs);
     }
 
     .tooltip {
-        font-size: 12px;
+        font-size: var(--fs-xs);
         padding: 12px 14px;
     }
 
     .tooltip strong {
-        font-size: 14px;
-    }
-
-    #search-container {
-        display: none;
-        /* Hide search on very small screens */
+        font-size: var(--fs-sm);
     }
 
     #view-mode-btn {
         right: 45px;
-        font-size: 10px;
+        font-size: var(--fs-xs);
         padding: 4px 8px;
     }
 
     #add-item-btn {
-        font-size: 22px;
+        font-size: 0;
     }
 
     #global-reset-btn {
         right: 80px;
-        font-size: 6px;
+        font-size: var(--fs-xs);
         padding: 3px 5px;
     }
 
     .axis-label {
-        font-size: 6px;
+        font-size: var(--fs-xs);
     }
 }
 
-/* Landscape mobile - also no scroll */
+/* Landscape mobile: side-by-side is great, just shrink the header */
 @media (max-height: 500px) and (orientation: landscape) {
 
+    /* Pin the viewport — eliminate residual body scroll */
     html,
     body {
-        /* Allow scrolling */
         width: 100%;
-        overflow-x: auto;
-        overflow-y: auto;
+        height: 100vh; /* fallback */
+        height: 100dvh;
+        overflow: hidden;
     }
 
     body {
         padding: 0;
+        display: flex;
+        flex-direction: column;
     }
 
     #header {
         padding: 4px 15px;
+        flex-shrink: 0;
     }
 
     #header h2 {
-        font-size: 0.85rem;
+        font-size: var(--fs-lg);
     }
 
+    /* Fill remaining height under header; row layout */
+    #main-layout {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: auto;
+        width: 100%;
+        margin: 0;
+        flex-direction: row;
+    }
+
+    /* Graph fills the left side */
     #graph-container {
-        height: calc(100dvh - 35px);
-        height: calc(100vh - 35px);
-        min-height: 500px;
-        min-width: 800px;
+        flex: 1 1 0;
+        min-height: 0;
+        height: auto;
+        /* Allow highlighted dot overflow */
+        overflow: visible;
+    }
+
+    /* Panel is fixed-width on the right; only it scrolls */
+    #tool-panel {
+        flex: 0 0 320px;
+        min-height: 0;
+        height: auto;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Tap-to-label: hide always-on labels in small landscape */
+    .dot-label {
+        display: none;
     }
 
     .tooltip {
@@ -1391,11 +1630,7 @@ button:active {
     }
 
     .axis-label {
-        font-size: 6px;
-    }
-
-    .dot-label {
-        font-size: 8px;
+        font-size: var(--fs-xs);
     }
 
     /* Controls even more compact */
@@ -1487,7 +1722,7 @@ button:active {
 
 @supports (padding: env(safe-area-inset-bottom)) {
     @media (max-width: 600px) {
-        #graph-container {
+        #tool-panel {
             padding-bottom: env(safe-area-inset-bottom);
         }
 
@@ -1646,7 +1881,7 @@ input:checked+.slider:before {
     color: #fff;
     padding: 10px 20px;
     border-radius: 30px;
-    font-size: 14px;
+    font-size: var(--fs-sm);
     border: 1px solid #444;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(5px);
@@ -1675,4 +1910,52 @@ input:checked+.slider:before {
         transform: translateY(-20px);
         opacity: 0;
     }
+}
+
+/* (old mobile-view-first block and mobile-sheet removed — replaced by #tool-panel) */
+
+/* ========================================= */
+/*     INLINE-STYLE REMOVAL: CSS TARGETS     */
+/* ========================================= */
+
+/* Header links (Privacy Policy, Contact Rob) */
+.header-link {
+    color: #666;
+    font-size: var(--fs-sm);
+    text-decoration: none;
+}
+
+/* Modal secondary/helper paragraph text */
+.modal-helper-text {
+    font-size: var(--fs-sm);
+    line-height: 1.5;
+}
+
+/* Admin panel helper description divs */
+.admin-help-text {
+    font-size: var(--fs-xs);
+    color: #666;
+}
+
+/* Admin modal inline labels (Voting Enabled, etc.) */
+.admin-toggle-label {
+    font-size: var(--fs-sm);
+    color: #eee;
+}
+
+/* Admin login trigger */
+#admin-login-trigger {
+    font-size: var(--fs-sm);
+}
+
+/* Confirm-vote username inline label */
+.vote-name-label {
+    font-size: var(--fs-xs);
+    color: #aaa;
+}
+
+/* Confirm-vote username disclosure line */
+.vote-name-disclosure {
+    font-size: var(--fs-xs);
+    color: #888;
 }

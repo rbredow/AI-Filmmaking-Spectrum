@@ -1,4 +1,5 @@
 /node_modules
+.mobile-shots/
 .DS_Store
 .env
 .npm

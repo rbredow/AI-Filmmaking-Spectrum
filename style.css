@@ -2,11 +2,11 @@
 /*         TYPE SCALE CSS VARIABLES         */
 /* ========================================= */
 :root {
-    --fs-xs:   12px;  /* floor — nothing readable smaller */
-    --fs-sm:   14px;
-    --fs-base: 16px;
-    --fs-lg:   18px;
-    --fs-xl:   24px;
+    --fs-xs:   10px;  /* floor — nothing readable smaller */
+    --fs-sm:   12px;
+    --fs-base: 14px;
+    --fs-lg:   14px;
+    --fs-xl:   18px;
 }
 
 body.initial-load *,
@@ -35,7 +35,7 @@ body {
 
 h2 {
     margin-bottom: 5px;
-    font-weight: 300;
+    font-weight: 700;
     letter-spacing: 1px;
     color: #fff;
     margin-top: 0;
@@ -125,7 +125,7 @@ p {
 /*              TOOL PANEL                   */
 /* ========================================= */
 #tool-panel {
-    width: 340px;
+    width: 300px;
     flex-shrink: 0;
     height: 100%;
     overflow-y: auto;
@@ -360,11 +360,11 @@ p {
     text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
 }
 
-/* Top Right Controls Group */
+/* Top Right Controls Group - moved to the left now!*/
 #top-right-controls {
     position: absolute;
     top: -34px;
-    right: 0;
+    left: 0;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -418,7 +418,7 @@ p {
 #branch-filter-btn {
     color: #888;
     font-size: var(--fs-sm);
-    font-weight: 700;
+    font-weight: 100;
     cursor: pointer;
     height: 28px;
     line-height: 26px; /* Adjusted for border */
@@ -742,8 +742,8 @@ p {
 /* --- CONSENSUS DOT (The Average) --- */
 .dot {
     position: absolute;
-    width: 22px;
-    height: 22px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
     cursor: grab;
     transform: translate(-50%, 50%);
@@ -1301,6 +1301,7 @@ button:active {
     #header h2 {
         font-size: var(--fs-lg);
         margin: 0;
+	font-weight: 700;
         white-space: nowrap;
     }
 

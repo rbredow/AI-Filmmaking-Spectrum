@@ -49,6 +49,8 @@ let itemsCache = {}; // Local cache of items for weighted calculations
 let svgLayer = null;
 let renderedItems = new Set();
 let viewMode = "2D"; // Default to 2D View
+let isOnboardingActive = false;
+let onboardingStep = 0;
 const ADMIN_EMAIL = "rob.bredow@gmail.com";
 
 // Escape user-supplied text before interpolating into innerHTML.
@@ -546,6 +548,55 @@ function initApp() {
                 <input type="text" id="search-input" placeholder="Search...">
             </div>
         </div>
+        <div id="onboarding-overlay" class="onboarding-overlay" style="display: none;">
+            <div id="onboard-word-x-left" class="onboard-hero-word x-left">ALGORITHMIC</div>
+            <div id="onboard-word-x-right" class="onboard-hero-word x-right">CREATIVE</div>
+            
+            <div id="onboard-x-spectrum-line" class="onboard-spectrum-line x-spectrum">
+                <svg class="spectrum-arrow-svg arrow-left" width="16" height="24" viewBox="0 0 16 24" aria-hidden="true">
+                    <path d="M14 3 L3 12 L14 21" fill="none" stroke="#94a3b8" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <div class="spectrum-line-bar bar-x"></div>
+                <svg class="spectrum-arrow-svg arrow-right" width="16" height="24" viewBox="0 0 16 24" aria-hidden="true">
+                    <path d="M2 3 L13 12 L2 21" fill="none" stroke="#60a5fa" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+
+            <div id="onboard-word-y-top" class="onboard-hero-word y-top">READY</div>
+            <div id="onboard-word-y-bottom" class="onboard-hero-word y-bottom">NOT READY</div>
+
+            <div id="onboard-y-spectrum-line" class="onboard-spectrum-line y-spectrum">
+                <svg class="spectrum-arrow-svg arrow-top" width="24" height="16" viewBox="0 0 24 16" aria-hidden="true">
+                    <path d="M3 14 L12 3 L21 14" fill="none" stroke="#00e676" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <div class="spectrum-line-bar bar-y"></div>
+                <svg class="spectrum-arrow-svg arrow-bottom" width="24" height="16" viewBox="0 0 24 16" aria-hidden="true">
+                    <path d="M3 2 L12 13 L21 2" fill="none" stroke="#ff3d00" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+
+            <div id="onboard-card-1" class="onboard-sample-card">
+                <div class="sample-card-header">
+                    <span class="sample-badge badge-algorithmic">Utility</span>
+                    <div class="sample-dot ready-high" id="sample-dot-1"><span class="dot-number">1</span></div>
+                </div>
+                <div class="sample-name">Denoising Sound</div>
+            </div>
+            <div id="onboard-card-2" class="onboard-sample-card">
+                <div class="sample-card-header">
+                    <span class="sample-badge badge-middle">In-Between</span>
+                    <div class="sample-dot ready-mid" id="sample-dot-2"><span class="dot-number">2</span></div>
+                </div>
+                <div class="sample-name">Character In-Betweening</div>
+            </div>
+            <div id="onboard-card-3" class="onboard-sample-card">
+                <div class="sample-card-header">
+                    <span class="sample-badge badge-creative">Generative</span>
+                    <div class="sample-dot ready-low" id="sample-dot-3"><span class="dot-number">3</span></div>
+                </div>
+                <div class="sample-name">Idea to Script</div>
+            </div>
+        </div>
     `;
     renderedItems.clear();
 
@@ -562,6 +613,9 @@ function initApp() {
             container.classList.remove("mode-1d");
         }
     };
+
+    // Re-bind Onboarding controls
+    setupOnboardingEventListeners();
 
 
     // Setup Branch Filter Logic
@@ -1090,7 +1144,7 @@ function setupVoteConfirmModal() {
 
 function createItemElements(container, item) {
     const avgDot = document.createElement("div");
-    avgDot.className = "dot";
+    avgDot.className = "dot" + (isOnboardingActive ? " onboarding-hidden" : "");
     avgDot.id = `dot-${item.id}`;
     updateElementPosition(avgDot, item.x, item.y);
     updateDotColor(avgDot, item.y);
@@ -1262,7 +1316,7 @@ function renderToolPanel() {
         const yVal = dot && dot.dataset.realY != null ? Math.round(parseFloat(dot.dataset.realY)) : Math.round(item.y || 0);
 
         const row = document.createElement("div");
-        row.className = "panel-row";
+        row.className = "panel-row" + (isOnboardingActive ? " onboarding-hidden" : "");
         row.id = `panel-row-${item.id}`;
         row.dataset.itemId = item.id;
 
@@ -1752,10 +1806,8 @@ function updateGraphFromData(allVotes, container) {
                 }
 
                 if (vDot) {
-                    if (
-                        shouldSplash ||
-                        Date.now() - (window.appLaunchTime || 0) < INITIAL_SHOW_TIME
-                    ) {
+                    const isRecent = vote.timestamp && (Date.now() - vote.timestamp < 120000);
+                    if (shouldSplash || isRecent) {
                         vDot.classList.add("visible");
                         clearTimeout(vDot.fadeTimeout);
                         vDot.fadeTimeout = setTimeout(
@@ -2192,21 +2244,549 @@ window.editItem = (id) => {
     modal.style.display = "flex";
 };
 
-// --- DISCLAIMER MODAL LOGIC ---
+// --- INTERACTIVE ONBOARDING CONTROLLER ---
+const ONBOARD_TOOLS = [
+    {
+        id: "d_sound",
+        name: "Denoising Sound",
+        badge: "Utility",
+        badgeClass: "badge-algorithmic",
+        x: 6.6,
+        y: 94.9,
+    },
+    {
+        id: "char_inbetween",
+        name: "Character In-Betweening",
+        badge: "In-Between",
+        badgeClass: "badge-middle",
+        x: 62.6,
+        y: 61.3,
+    },
+    {
+        id: "idea_script",
+        name: "Idea to Script",
+        badge: "Generative",
+        badgeClass: "badge-creative",
+        x: 97.0,
+        y: 10.8,
+    },
+];
+
+let onboardingTimers = [];
+let isStepAnimating = false;
+
+function clearOnboardingTimers() {
+    onboardingTimers.forEach((t) => clearTimeout(t));
+    onboardingTimers = [];
+    isStepAnimating = false;
+}
+
+function addOnboardingTimer(fn, delay) {
+    const timer = setTimeout(fn, delay);
+    onboardingTimers.push(timer);
+    return timer;
+}
+
+function fastForwardCurrentStep() {
+    if (!isStepAnimating) return;
+    clearOnboardingTimers();
+
+    if (onboardingStep === 1) {
+        const xLine = document.getElementById("onboard-x-spectrum-line");
+        if (xLine) xLine.classList.add("visible");
+
+        ONBOARD_TOOLS.forEach((tool, index) => {
+            const card = document.getElementById(`onboard-card-${index + 1}`);
+            if (card) {
+                card.className = "onboard-sample-card visible";
+                card.style.left = `${tool.x}%`;
+                card.style.bottom = "44%";
+                if (tool.x < 15) card.classList.add("card-left");
+                else if (tool.x > 85) card.classList.add("card-right");
+            }
+        });
+
+        const sidebar = document.getElementById("onboard-sidebar-panel");
+        if (sidebar) sidebar.classList.add("visible");
+    } else if (onboardingStep === 2) {
+        const yLine = document.getElementById("onboard-y-spectrum-line");
+        if (yLine) yLine.classList.add("visible");
+
+        ONBOARD_TOOLS.forEach((tool, index) => {
+            const card = document.getElementById(`onboard-card-${index + 1}`);
+            if (card) {
+                card.className = "onboard-sample-card visible";
+                card.style.left = `${tool.x}%`;
+                card.style.bottom = `${tool.y}%`;
+                if (tool.x < 15) card.classList.add("card-left");
+                else if (tool.x > 85) card.classList.add("card-right");
+            }
+        });
+
+        const sidebar = document.getElementById("onboard-sidebar-panel");
+        if (sidebar) sidebar.classList.add("visible");
+    }
+}
+
+function handleOnboardingAdvance() {
+    if (isStepAnimating) {
+        fastForwardCurrentStep();
+    } else {
+        if (onboardingStep === 1) renderOnboardingStep2();
+        else if (onboardingStep === 2) completeOnboarding();
+    }
+}
+
+function setupOnboardingEventListeners() {
+    const overlay = document.getElementById("onboarding-overlay");
+    const nextBtn = document.getElementById("onboard-next-btn");
+    const skipBtn = document.getElementById("onboard-skip-btn");
+
+    if (nextBtn) {
+        nextBtn.onclick = (e) => {
+            e.stopPropagation();
+            handleOnboardingAdvance();
+        };
+    }
+
+    if (skipBtn) {
+        skipBtn.onclick = (e) => {
+            e.stopPropagation();
+            skipOnboarding();
+        };
+    }
+
+    if (overlay) {
+        overlay.onclick = (e) => {
+            if (e.target.closest("button") || e.target.closest("#onboard-sidebar-panel")) return;
+            handleOnboardingAdvance();
+        };
+    }
+}
+
+function startOnboarding(force = false) {
+    clearOnboardingTimers();
+    isOnboardingActive = true;
+    onboardingStep = 1;
+
+    const overlay = document.getElementById("onboarding-overlay");
+    const container = document.getElementById("graph-container");
+    const panel = document.getElementById("tool-panel-inner");
+    const sidebar = document.getElementById("onboard-sidebar-panel");
+    if (!overlay || !container) return;
+
+    overlay.style.display = "block";
+    overlay.style.opacity = "1";
+
+    if (sidebar) {
+        sidebar.style.display = "flex";
+        sidebar.classList.remove("visible");
+    }
+
+    // Hide standard tools and panel rows during onboarding
+    container.querySelectorAll(".dot").forEach((d) => {
+        d.classList.add("onboarding-hidden");
+        d.classList.remove("cascade-revealing");
+    });
+    if (panel) {
+        panel.querySelectorAll(".panel-row").forEach((r) => {
+            r.classList.add("onboarding-hidden");
+            r.classList.remove("cascade-revealing");
+        });
+    }
+
+    // Hide standard axis labels
+    container.querySelectorAll(".axis-label").forEach((l) => (l.style.opacity = "0"));
+    const controls = document.getElementById("top-right-controls");
+    if (controls) controls.style.opacity = "0.2";
+
+    renderOnboardingStep1();
+}
+
+function renderOnboardingStep1() {
+    clearOnboardingTimers();
+    onboardingStep = 1;
+    isStepAnimating = true;
+
+    const overlay = document.getElementById("onboarding-overlay");
+    const sidebar = document.getElementById("onboard-sidebar-panel");
+    if (!overlay) return;
+
+    // Reset lines
+    const xLine = document.getElementById("onboard-x-spectrum-line");
+    const yLine = document.getElementById("onboard-y-spectrum-line");
+    if (xLine) xLine.classList.remove("visible");
+    if (yLine) yLine.classList.remove("visible");
+
+    // Words
+    const wordXLeft = document.getElementById("onboard-word-x-left");
+    const wordXRight = document.getElementById("onboard-word-x-right");
+    const wordYTop = document.getElementById("onboard-word-y-top");
+    const wordYBottom = document.getElementById("onboard-word-y-bottom");
+
+    if (wordXLeft) {
+        wordXLeft.className = "onboard-hero-word x-left";
+        wordXLeft.style.opacity = "1";
+    }
+    if (wordXRight) {
+        wordXRight.className = "onboard-hero-word x-right";
+        wordXRight.style.opacity = "1";
+    }
+    if (wordYTop) wordYTop.style.opacity = "0";
+    if (wordYBottom) wordYBottom.style.opacity = "0";
+
+    // Reset cards to hidden state
+    ONBOARD_TOOLS.forEach((tool, index) => {
+        const card = document.getElementById(`onboard-card-${index + 1}`);
+        if (card) {
+            card.className = "onboard-sample-card";
+            card.style.left = `${tool.x}%`;
+            card.style.bottom = "44%";
+            if (tool.x < 15) card.classList.add("card-left");
+            else if (tool.x > 85) card.classList.add("card-right");
+        }
+    });
+
+    // Populate Sidebar Content
+    const indicator = document.getElementById("onboard-step-indicator");
+    const title = document.getElementById("onboard-title");
+    const body = document.getElementById("onboard-body");
+    const caveat = document.getElementById("onboard-caveat");
+    const nextBtn = document.getElementById("onboard-next-btn");
+
+    if (indicator) indicator.innerText = "Step 1 of 2";
+    if (title) title.innerText = "The Spectrum of Autonomy";
+    if (body) body.innerText = "Tools range from algorithmic utility to open-ended creative generation.";
+    if (caveat) caveat.innerText = "This is not designed to be a definitive document that describes all the tools available for filmmaking: there are certainly some that are missing.";
+    if (nextBtn) nextBtn.innerText = "Next →";
+
+    if (sidebar) {
+        sidebar.style.display = "flex";
+        sidebar.classList.remove("visible");
+    }
+
+    // Phased Animation:
+    // Phase 2 (0.8s): Wipe on horizontal arrow line
+    addOnboardingTimer(() => {
+        if (xLine) xLine.classList.add("visible");
+    }, 800);
+
+    // Phase 3: Pop on tools one by one
+    // Tool 1: Denoising Sound (Utility) at 1.8s
+    addOnboardingTimer(() => {
+        const card1 = document.getElementById("onboard-card-1");
+        if (card1) card1.classList.add("visible");
+    }, 1800);
+
+    // Tool 2: Character In-Betweening (In-Between) at 2.6s
+    addOnboardingTimer(() => {
+        const card2 = document.getElementById("onboard-card-2");
+        if (card2) card2.classList.add("visible");
+    }, 2600);
+
+    // Tool 3: Idea to Script (Generative) at 3.4s
+    addOnboardingTimer(() => {
+        const card3 = document.getElementById("onboard-card-3");
+        if (card3) card3.classList.add("visible");
+    }, 3400);
+
+    // Phase 4 (4.2s): Sidebar card fades in
+    addOnboardingTimer(() => {
+        if (sidebar) sidebar.classList.add("visible");
+        isStepAnimating = false;
+    }, 4200);
+}
+
+function renderOnboardingStep2() {
+    clearOnboardingTimers();
+    onboardingStep = 2;
+    isStepAnimating = true;
+
+    const overlay = document.getElementById("onboarding-overlay");
+    const sidebar = document.getElementById("onboard-sidebar-panel");
+    if (!overlay) return;
+
+    // Animate X words flying down to axis
+    const wordXLeft = document.getElementById("onboard-word-x-left");
+    const wordXRight = document.getElementById("onboard-word-x-right");
+    const wordYTop = document.getElementById("onboard-word-y-top");
+    const wordYBottom = document.getElementById("onboard-word-y-bottom");
+
+    if (wordXLeft) wordXLeft.classList.add("flying-down");
+    if (wordXRight) wordXRight.classList.add("flying-down");
+
+    // Fade out X spectrum line
+    const xLine = document.getElementById("onboard-x-spectrum-line");
+    if (xLine) xLine.classList.remove("visible");
+
+    // Fade in standard bottom axis labels
+    const container = document.getElementById("graph-container");
+    if (container) {
+        const xLeft = container.querySelector(".x-label-left");
+        const xRight = container.querySelector(".x-label-right");
+        if (xLeft) xLeft.style.opacity = "1";
+        if (xRight) xRight.style.opacity = "1";
+    }
+
+    // Bring on large Y words
+    if (wordYTop) {
+        wordYTop.className = "onboard-hero-word y-top";
+        wordYTop.style.opacity = "1";
+    }
+    if (wordYBottom) {
+        wordYBottom.className = "onboard-hero-word y-bottom";
+        wordYBottom.style.opacity = "1";
+    }
+
+    // Hide sidebar temporarily while animation plays
+    if (sidebar) sidebar.classList.remove("visible");
+
+    // Update Sidebar text for Step 2
+    const indicator = document.getElementById("onboard-step-indicator");
+    const title = document.getElementById("onboard-title");
+    const body = document.getElementById("onboard-body");
+    const caveat = document.getElementById("onboard-caveat");
+    const nextBtn = document.getElementById("onboard-next-btn");
+
+    if (indicator) indicator.innerText = "Step 2 of 2";
+    if (title) title.innerText = "Production Readiness";
+    if (body) body.innerText = "The vertical axis reflects whether a tool is currently reliable for production workflows or still experimental.";
+    if (caveat) caveat.innerText = "The precise position of the tools on the graph is just the subjective opinion of those who have voted on the project so far.";
+    if (nextBtn) nextBtn.innerText = "Explore Spectrum →";
+
+    // Phase 2 (0.8s): Draw vertical graduated spectrum line with arrows
+    const yLine = document.getElementById("onboard-y-spectrum-line");
+    addOnboardingTimer(() => {
+        if (yLine) yLine.classList.add("visible");
+    }, 800);
+
+    // Phase 3: Animate tools into their 2D Y positions
+    // Tool 1: Denoising Sound rises to 94.9% at 1.5s
+    addOnboardingTimer(() => {
+        const card1 = document.getElementById("onboard-card-1");
+        if (card1) card1.style.bottom = `${ONBOARD_TOOLS[0].y}%`;
+    }, 1500);
+
+    // Tool 2: Character In-Betweening glides to 61.3% at 2.2s
+    addOnboardingTimer(() => {
+        const card2 = document.getElementById("onboard-card-2");
+        if (card2) card2.style.bottom = `${ONBOARD_TOOLS[1].y}%`;
+    }, 2200);
+
+    // Tool 3: Idea to Script glides to 10.8% at 2.9s
+    addOnboardingTimer(() => {
+        const card3 = document.getElementById("onboard-card-3");
+        if (card3) card3.style.bottom = `${ONBOARD_TOOLS[2].y}%`;
+    }, 2900);
+
+    // Phase 4 (3.8s): Sidebar card fades up
+    addOnboardingTimer(() => {
+        if (sidebar) sidebar.classList.add("visible");
+        isStepAnimating = false;
+    }, 3800);
+}
+
+function completeOnboarding() {
+    if (!isOnboardingActive) return;
+    clearOnboardingTimers();
+    onboardingStep = 3;
+
+    const overlay = document.getElementById("onboarding-overlay");
+    const container = document.getElementById("graph-container");
+    const panel = document.getElementById("tool-panel-inner");
+    const sidebar = document.getElementById("onboard-sidebar-panel");
+
+    // Animate Y words flying to axis
+    const wordYTop = document.getElementById("onboard-word-y-top");
+    const wordYBottom = document.getElementById("onboard-word-y-bottom");
+    if (wordYTop) wordYTop.classList.add("flying-axis");
+    if (wordYBottom) wordYBottom.classList.add("flying-axis");
+
+    // Fade out lines
+    const yLine = document.getElementById("onboard-y-spectrum-line");
+    if (yLine) yLine.classList.remove("visible");
+
+    // Fade out sample cards & sidebar panel
+    if (overlay) {
+        overlay.querySelectorAll(".onboard-sample-card").forEach((c) => c.classList.remove("visible"));
+    }
+    if (sidebar) {
+        sidebar.classList.remove("visible");
+        setTimeout(() => {
+            sidebar.style.display = "none";
+        }, 500);
+    }
+
+    // Fade in all standard axis labels and top-right controls
+    if (container) {
+        container.querySelectorAll(".axis-label").forEach((l) => (l.style.opacity = "1"));
+        const controls = document.getElementById("top-right-controls");
+        if (controls) controls.style.opacity = "1";
+    }
+
+    // Fade out overlay
+    setTimeout(() => {
+        if (overlay) {
+            overlay.style.opacity = "0";
+            setTimeout(() => {
+                overlay.style.display = "none";
+            }, 500);
+        }
+    }, 400);
+
+    // Staggered Diagonal Tool Reveal (~1.4s total)
+    revealToolsInCascade();
+
+    localStorage.setItem("onboarding_seen", "true");
+    localStorage.setItem("disclaimer_seen", "true");
+    isOnboardingActive = false;
+}
+
+function skipOnboarding() {
+    clearOnboardingTimers();
+    const overlay = document.getElementById("onboarding-overlay");
+    const container = document.getElementById("graph-container");
+    const panel = document.getElementById("tool-panel-inner");
+    const sidebar = document.getElementById("onboard-sidebar-panel");
+
+    if (overlay) {
+        overlay.style.display = "none";
+        overlay.style.opacity = "0";
+    }
+    if (sidebar) {
+        sidebar.style.display = "none";
+        sidebar.classList.remove("visible");
+    }
+
+    if (container) {
+        container.querySelectorAll(".dot").forEach((d) => {
+            d.classList.remove("onboarding-hidden");
+            d.classList.remove("cascade-revealing");
+        });
+        container.querySelectorAll(".axis-label").forEach((l) => (l.style.opacity = "1"));
+        const controls = document.getElementById("top-right-controls");
+        if (controls) controls.style.opacity = "1";
+    }
+
+    if (panel) {
+        panel.querySelectorAll(".panel-row").forEach((r) => {
+            r.classList.remove("onboarding-hidden");
+            r.classList.remove("cascade-revealing");
+        });
+    }
+
+    localStorage.setItem("onboarding_seen", "true");
+    localStorage.setItem("disclaimer_seen", "true");
+    isOnboardingActive = false;
+}
+
+function revealToolsInCascade() {
+    const container = document.getElementById("graph-container");
+    const panel = document.getElementById("tool-panel-inner");
+    if (!container) return;
+
+    const dots = Array.from(container.querySelectorAll(".dot"));
+    if (dots.length === 0) return;
+
+    // Calculate diagonal ranking: (100 - Y) + X (top-left first, bottom-right last)
+    const scoredDots = dots.map((dot) => {
+        const x = dot.dataset.realX != null ? parseFloat(dot.dataset.realX) : 50;
+        const y = dot.dataset.realY != null ? parseFloat(dot.dataset.realY) : 50;
+        const score = (100 - y) + x;
+        const itemId = dot.id.replace("dot-", "");
+        return { dot, itemId, score };
+    });
+
+    scoredDots.sort((a, b) => a.score - b.score);
+
+    const totalDuration = 1400; // ms (~1.4s total)
+    const stepDuration = totalDuration / Math.max(1, scoredDots.length - 1);
+
+    scoredDots.forEach((item, index) => {
+        const delay = index * stepDuration;
+        setTimeout(() => {
+            item.dot.classList.remove("onboarding-hidden");
+            item.dot.classList.add("cascade-revealing");
+
+            const row = document.getElementById(`panel-row-${item.itemId}`);
+            if (row) {
+                row.classList.remove("onboarding-hidden");
+                row.classList.add("cascade-revealing");
+            }
+        }, delay);
+    });
+
+    // Cleanup and show drag-to-vote tip after cascade ends
+    setTimeout(() => {
+        dots.forEach((d) => d.classList.remove("cascade-revealing"));
+        if (panel) {
+            panel.querySelectorAll(".panel-row").forEach((r) => r.classList.remove("cascade-revealing"));
+        }
+        showDragVoteTip();
+    }, totalDuration + 400);
+}
+
+function showDragVoteTip() {
+    let tip = document.getElementById("drag-vote-tip");
+    const container = document.getElementById("graph-container");
+    if (!tip && container) {
+        tip = document.createElement("div");
+        tip.id = "drag-vote-tip";
+        tip.innerHTML = "💡 <strong>Tip:</strong> Drag any tool dot or click in the list to cast your vote!";
+        container.appendChild(tip);
+    }
+    if (tip) {
+        tip.classList.add("show");
+        setTimeout(() => {
+            tip.classList.remove("show");
+        }, 5000);
+    }
+}
+
+// Keyboard Navigation for Onboarding
+document.addEventListener("keydown", (e) => {
+    if (!isOnboardingActive) return;
+    if (e.key === "Enter" || e.key === " " || e.key === "ArrowRight") {
+        e.preventDefault();
+        handleOnboardingAdvance();
+    } else if (e.key === "Escape") {
+        e.preventDefault();
+        skipOnboarding();
+    }
+});
+
+// Replay Intro Button Handler
+const replayBtn = document.getElementById("replay-intro-btn");
+if (replayBtn) {
+    replayBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const header = document.getElementById("header");
+        if (header) header.classList.remove("settings-open");
+        startOnboarding(true);
+    };
+}
+
+// --- DISCLAIMER MODAL LOGIC & ONBOARDING ENTRY ---
 const disclaimerModal = document.getElementById("disclaimer-modal");
-if (disclaimerModal && !localStorage.getItem("disclaimer_seen")) {
+const disclaimerSeen = localStorage.getItem("disclaimer_seen");
+const onboardingSeen = localStorage.getItem("onboarding_seen");
+
+if (disclaimerModal && !disclaimerSeen) {
     disclaimerModal.style.display = "flex";
     const dismissDisclaimer = () => {
         disclaimerModal.style.display = "none";
         localStorage.setItem("disclaimer_seen", "true");
+        startOnboarding();
     };
     const btn = document.getElementById("disclaimer-btn");
     if (btn) btn.onclick = dismissDisclaimer;
     disclaimerModal.onclick = (e) => {
         if (e.target === disclaimerModal) dismissDisclaimer();
     };
-} else {
-    // Already seen
+} else if (!onboardingSeen) {
+    // If disclaimer was accepted in previous version but onboarding not seen yet
+    startOnboarding();
 }
 
 // --- SETTINGS POPUP (portrait header: voter/privacy/contact) ---
@@ -2223,7 +2803,8 @@ document.addEventListener("click", (e) => {
     if (e.target.closest("#settings-toggle")) return;
     // Clicks on empty menu chrome keep it open; links / username close it
     const inMenu = e.target.closest("#header-meta");
-    const isAction = e.target.closest("a") || e.target.closest("#user-display");
+    const isAction = e.target.closest("a") || e.target.closest("button") || e.target.closest("#user-display");
     if (inMenu && !isAction) return;
     header.classList.remove("settings-open");
 });
+

@@ -42,11 +42,30 @@ You can [view the project online here](https://rbredow.github.io/AI-Filmmaking-S
 *   **Auth:** Firebase Anonymous Auth (for voters) & Google Auth (for Admin).
 *   **Hosting:** Local static server (for dev).
 
-## Setup
-1.  Clone repository.
-2.  Serve locally: `python3 -m http.server`
-3.  Open `http://localhost:8000`.
+## Development & Setup
+
+1. **Clone repository.**
+2. **Install / Run locally:**
+   ```bash
+   npm run dev
+   ```
+   *Runs `http-server` on `http://localhost:8000`.*
+
+## Database Backup & Snapshotting
+
+The app includes a built-in snapshot tool to back up the live Firebase Realtime Database and freeze data for static viewing:
+
+```bash
+npm run snapshot
+```
+
+### What this does:
+* **Pulls live data:** Fetches all `/items`, `/votes`, and `/settings` directly from the production Firebase Realtime Database via read-only REST endpoints (no credentials required).
+* **Saves locally:** Writes a pretty-printed, deep-key-sorted JSON file to `data/snapshot.json`.
+* **Drives static mode:** When voting is closed (`votingEnabled: false`), visitors to GitHub Pages view `data/snapshot.json` directly without establishing open database WebSocket connections.
+
+> **Tip:** Always run `npm run snapshot` and commit the updated `data/snapshot.json` after concluding a live voting session or before performing administrative resets.
 
 ## Firebase Quota Note
-*   **Free Tier (Spark):** Limited to **100 concurrent connections**.
-*   **Recommendation:** For an audience >100, upgrade to **Blaze Plan** (Pay-as-you-go). Cost is negligible for this data volume, but it removes the connection cap.
+* **Free Tier (Spark):** Limited to **100 concurrent connections**.
+* **Recommendation:** For an audience >100, upgrade to **Blaze Plan** (Pay-as-you-go). Cost is negligible for this data volume, but it removes the connection cap.

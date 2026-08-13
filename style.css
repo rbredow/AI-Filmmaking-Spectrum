@@ -144,7 +144,7 @@ p {
     padding: 10px 14px;
     border-bottom: 1px solid #1a1a1a;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background 0.15s, opacity 0.25s ease, filter 0.25s ease;
     position: relative;
 }
 
@@ -160,6 +160,21 @@ p {
     background: #1a2438;
     border-left: 3px solid #3b82f6;
     padding-left: 11px;
+}
+
+.panel-row.dimmed {
+    opacity: 0.25;
+    filter: grayscale(80%);
+}
+
+.panel-row.dimmed:hover {
+    opacity: 0.65;
+    filter: grayscale(30%);
+}
+
+.panel-row.dimmed.row-active {
+    opacity: 1;
+    filter: none;
 }
 
 .panel-row-head {

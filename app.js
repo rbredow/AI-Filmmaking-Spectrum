@@ -642,7 +642,7 @@ function initApp() {
             cb.onchange = (e) => {
                 if (e.target.checked) selectedTags.add(e.target.value);
                 else selectedTags.delete(e.target.value);
-                applyFilters();
+                applyFilters({ scrollToTop: true });
             };
         });
         
@@ -654,48 +654,7 @@ function initApp() {
     // Setup Search Logic
     const searchInput = document.getElementById("search-input");
     if (searchInput) {
-        searchInput.oninput = () => applyFilters();
-    }
-
-    function applyFilters() {
-        const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
-        const container = document.getElementById("graph-container");
-        
-        let hasFilter = query !== "" || selectedTags.size > 0;
-
-        if (hasFilter) {
-            container.classList.add("searching");
-            renderedItems.forEach((id) => {
-                const dot = document.getElementById(`dot-${id}`);
-                const label = document.getElementById(`label-${id}`);
-                const item = itemsCache[id];
-                
-                let matchesSearch = true;
-                if (query) {
-                    matchesSearch = label && label.innerText.toLowerCase().includes(query);
-                }
-
-                let matchesTag = true;
-                if (selectedTags.size > 0) {
-                    if (!item || !item.tags || item.tags.length === 0) {
-                        matchesTag = false;
-                    } else {
-                        matchesTag = item.tags.some(tag => selectedTags.has(tag));
-                    }
-                }
-
-                if (dot) {
-                    if (matchesSearch && matchesTag) dot.classList.add("search-match");
-                    else dot.classList.remove("search-match");
-                }
-            });
-        } else {
-            container.classList.remove("searching");
-            renderedItems.forEach((id) => {
-                const dot = document.getElementById(`dot-${id}`);
-                if (dot) dot.classList.remove("search-match");
-            });
-        }
+        searchInput.oninput = () => applyFilters({ scrollToTop: true });
     }
 
     svgLayer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -1295,22 +1254,119 @@ function clearHighlight() {
     }
 }
 
+// --- FILTER AND REORDER LOGIC ---
+function applyFilters(options = {}) {
+    const searchInput = document.getElementById("search-input");
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
+    const container = document.getElementById("graph-container");
+    const branchBtn = document.getElementById("branch-filter-btn");
+    const panelInner = document.getElementById("tool-panel-inner");
+
+    const hasFilter = query !== "" || selectedTags.size > 0;
+
+    if (container) {
+        container.classList.toggle("searching", hasFilter);
+    }
+    if (branchBtn) {
+        branchBtn.classList.toggle("active", selectedTags.size > 0);
+    }
+
+    const matchingItems = [];
+    const nonMatchingItems = [];
+    const allItems = Object.values(itemsCache);
+
+    allItems.forEach((item) => {
+        let isMatch = true;
+        if (hasFilter) {
+            let matchesSearch = true;
+            if (query) {
+                const name = (item.name || "").toLowerCase();
+                const desc = (item.desc || "").toLowerCase();
+                matchesSearch = name.includes(query) || desc.includes(query);
+            }
+
+            let matchesTag = true;
+            if (selectedTags.size > 0) {
+                if (!item.tags || item.tags.length === 0) {
+                    matchesTag = false;
+                } else {
+                    matchesTag = item.tags.some((tag) => selectedTags.has(tag));
+                }
+            }
+
+            isMatch = matchesSearch && matchesTag;
+        }
+
+        if (!hasFilter || isMatch) {
+            matchingItems.push(item);
+        } else {
+            nonMatchingItems.push(item);
+        }
+
+        // Update dot on graph
+        const dot = document.getElementById(`dot-${item.id}`);
+        if (dot) {
+            dot.classList.toggle("search-match", hasFilter && isMatch);
+        }
+
+        // Update voter dots on graph
+        const voterDots = document.querySelectorAll(
+            `.voter-dot[id^="voter-dot-${item.id}-"]`,
+        );
+        voterDots.forEach((vDot) => {
+            vDot.classList.toggle("search-match", hasFilter && isMatch);
+        });
+    });
+
+    // Sort each group alphabetically by name
+    matchingItems.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    nonMatchingItems.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+    const orderedItems = [...matchingItems, ...nonMatchingItems];
+
+    // Reorder panel rows and update numbering for both tool panel and graph dots
+    if (panelInner) {
+        orderedItems.forEach((item, index) => {
+            const number = index + 1;
+            const row = document.getElementById(`panel-row-${item.id}`);
+            const isDimmed = hasFilter && index >= matchingItems.length;
+
+            if (row) {
+                panelInner.appendChild(row);
+                row.classList.toggle("dimmed", isDimmed);
+
+                const rowNum = document.getElementById(`rownum-${item.id}`);
+                if (rowNum) {
+                    rowNum.textContent = number;
+                }
+            }
+
+            const dotNum = document.getElementById(`dotnum-${item.id}`);
+            if (dotNum) {
+                dotNum.textContent = number;
+            }
+        });
+    }
+
+    if (options.scrollToTop && hasFilter) {
+        const toolPanel = document.getElementById("tool-panel");
+        if (toolPanel) {
+            toolPanel.scrollTop = 0;
+        }
+    }
+}
+
 // --- TOOL PANEL RENDER ---
 function renderToolPanel() {
     const panelInner = document.getElementById("tool-panel-inner");
     if (!panelInner) return;
 
-    // Sort items by name for a readable list
-    const items = Object.values(itemsCache).sort((a, b) =>
-        (a.name || "").localeCompare(b.name || "")
-    );
-
-    // Build rows once. We'll update metric bars/numbers via updateGraphFromData.
     // Clear existing rows first (handles item additions/removals in live mode).
     panelInner.innerHTML = "";
 
-    items.forEach((item, index) => {
-        const number = index + 1;
+    const items = Object.values(itemsCache);
+
+    items.forEach((item) => {
         // Read consensus position from DOM if available (works in both modes)
         const dot = document.getElementById(`dot-${item.id}`);
         const xVal = dot && dot.dataset.realX != null ? Math.round(parseFloat(dot.dataset.realX)) : Math.round(item.x || 0);
@@ -1328,7 +1384,7 @@ function renderToolPanel() {
         // Row HTML — all user fields escaped
         row.innerHTML = `
             <div class="panel-row-head">
-                <span class="panel-row-num" id="rownum-${item.id}" style="background-color:${readinessColor(yVal)}; border-color:${readinessColor(yVal)}; color:#0a0a0a;">${number}</span>
+                <span class="panel-row-num" id="rownum-${item.id}" style="background-color:${readinessColor(yVal)}; border-color:${readinessColor(yVal)}; color:#0a0a0a;"></span>
                 <div class="panel-row-name"></div>
             </div>
             <div class="panel-metrics">
@@ -1369,11 +1425,10 @@ function renderToolPanel() {
         });
 
         panelInner.appendChild(row);
-
-        // Keep the on-graph dot number in sync with this row's number
-        const dotNum = document.getElementById(`dotnum-${item.id}`);
-        if (dotNum) dotNum.textContent = number;
     });
+
+    // Apply filtering, ordering, and numbering across both rows and dot badges
+    applyFilters();
 }
 
 // --- TAP-TO-SHOW TOOLTIP FOR TOUCH DEVICES ---

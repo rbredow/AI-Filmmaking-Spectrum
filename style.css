@@ -624,6 +624,8 @@ p {
     width: 80px;
     outline: none;
     transition: width 0.3s;
+    -webkit-appearance: none;
+    border-radius: 0;
 }
 
 #search-input:focus {
@@ -1548,8 +1550,7 @@ button:active {
 
     /* Controls use the smallest type token on mobile */
     #branch-filter-btn,
-    #view-mode-btn,
-    #search-input {
+    #view-mode-btn {
         font-size: var(--fs-xs);
     }
 
@@ -1570,12 +1571,13 @@ button:active {
     }
 
     #search-input {
-        width: 60px;
-        font-size: var(--fs-xs);
+        width: 65px;
+        font-size: 16px; /* 16px prevents iOS Safari auto-zoom on focus (<16px triggers zoom) */
+        line-height: normal;
     }
 
     #search-input:focus {
-        width: 100px;
+        width: 105px;
     }
 
     /* Compact the add button to a "+" so controls fit one row */
@@ -1647,8 +1649,10 @@ button:active {
         font-size: var(--fs-base);
     }
 
-    .form-group input[type="text"] {
+    .form-group input[type="text"],
+    .form-group input[type="search"] {
         padding: 12px;
+        font-size: 16px; /* Prevents iOS auto-zoom */
     }
 
     .form-group input[type="range"] {
@@ -1876,6 +1880,15 @@ button:active {
 
     .primary-btn:active {
         background: #1d4ed8;
+    }
+
+    /* Prevent iOS Safari auto-zoom on input focus for touch devices */
+    #search-input,
+    input[type="text"],
+    input[type="search"],
+    select,
+    textarea {
+        font-size: 16px;
     }
 }
 

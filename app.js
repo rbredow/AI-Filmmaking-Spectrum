@@ -546,7 +546,7 @@ function initApp() {
             </div>
             <div id="search-container">
                 <span id="search-icon">🔍</span>
-                <input type="text" id="search-input" placeholder="Search...">
+                <input type="search" id="search-input" placeholder="Search..." enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
             </div>
         </div>
         <div id="onboarding-overlay" class="onboarding-overlay" style="display: none;">
@@ -655,6 +655,19 @@ function initApp() {
     const searchInput = document.getElementById("search-input");
     if (searchInput) {
         searchInput.oninput = () => applyFilters({ scrollToTop: true });
+        searchInput.addEventListener("search", () => applyFilters({ scrollToTop: true }));
+        searchInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                searchInput.blur();
+            } else if (e.key === "Escape") {
+                if (searchInput.value) {
+                    searchInput.value = "";
+                    applyFilters({ scrollToTop: true });
+                }
+                searchInput.blur();
+            }
+        });
     }
 
     svgLayer = document.createElementNS("http://www.w3.org/2000/svg", "svg");

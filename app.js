@@ -51,6 +51,7 @@ let renderedItems = new Set();
 let viewMode = "2D"; // Default to 2D View
 let isOnboardingActive = false;
 let onboardingStep = 0;
+let hasLoadedInitialVotes = false;
 const ADMIN_EMAIL = "rob.bredow@gmail.com";
 
 // Escape user-supplied text before interpolating into innerHTML.
@@ -1784,14 +1785,16 @@ function updateGraphFromData(allVotes, container) {
             const vote = itemVotes[uid];
             const prevVote = prevItemVotes[uid];
 
-            // 1. Splash Logic
+            // 1. Splash Logic (Only for live incoming updates after initial page load)
             let shouldSplash = false;
-            if (!prevVote) shouldSplash = true;
-            else if (
-                Math.abs(vote.x - prevVote.x) > 1 ||
-                Math.abs(vote.y - prevVote.y) > 1
-            )
-                shouldSplash = true;
+            if (hasLoadedInitialVotes) {
+                if (!prevVote) shouldSplash = true;
+                else if (
+                    Math.abs(vote.x - prevVote.x) > 1 ||
+                    Math.abs(vote.y - prevVote.y) > 1
+                )
+                    shouldSplash = true;
+            }
             if (shouldSplash) triggerSplash(container, vote.x, vote.y);
 
             // 2. Voter Dot Logic (Other Users)
@@ -1971,6 +1974,7 @@ function updateGraphFromData(allVotes, container) {
             }
         }
     });
+    hasLoadedInitialVotes = true;
     previousData = JSON.parse(JSON.stringify(allVotes));
 
     // After all dots have moved, schedule label de-overlap pass

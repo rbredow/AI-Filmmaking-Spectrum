@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-08-13T19:07:18.562Z",
+  "capturedAt": "2026-08-14T02:36:41.325Z",
   "source": "ai-filmmaking-spectrum-default-rtdb.firebaseio.com",
   "settings": {
     "addingEnabled": false,
@@ -34,10 +34,11 @@
       "y": 89.3773
     },
     "d03": {
-      "desc": "Topaz/Nvidia. Essential for remastering archival footage.",
+      "desc": "Creating more detail and resolution from lower quality footage or images",
       "id": "d03",
       "name": "Upscaling",
       "tags": [
+        "Animation",
         "Cinematographers",
         "Film Editors",
         "Visual Effects"
@@ -57,12 +58,12 @@
       "y": 92.8
     },
     "d05": {
-      "desc": "Magic Mask. Automating cutouts. 90% perfect, 10% manual fix.",
+      "desc": "Automating cutouts and isolation mattes.",
       "id": "d05",
       "name": "Rotoscoping",
       "tags": [
-        "Visual Effects",
-        "Animation"
+        "Animation",
+        "Visual Effects"
       ],
       "x": 29.0692,
       "y": 86.8517
@@ -101,24 +102,24 @@
       "y": 69.9636
     },
     "d09": {
-      "desc": "Move.ai/Wonder Studio. Video -> 3D Animation.",
+      "desc": "Video to 3D Animation without markers",
       "id": "d09",
       "name": "Markerless Mocap",
       "tags": [
+        "Actors",
         "Animation",
-        "Visual Effects",
-        "Actors"
+        "Visual Effects"
       ],
       "x": 25,
       "y": 73
     },
     "d10": {
-      "desc": "ElevenLabs. Tone is great, acting performance needs human guiding.",
+      "desc": "Changing one voice into another likeness",
       "id": "d10",
       "name": "Voice Cloning",
       "tags": [
-        "Sound",
-        "Actors"
+        "Actors",
+        "Sound"
       ],
       "x": 52.4,
       "y": 85
@@ -137,7 +138,7 @@
       "y": 81.6477
     },
     "d13": {
-      "desc": "Removing objects. Great for still shots, struggles with motion.",
+      "desc": "Removing objects from moving shots",
       "id": "d13",
       "name": "In-Painting",
       "tags": [
@@ -161,18 +162,18 @@
       "y": 81.1957
     },
     "d15": {
-      "desc": "Extending sets. Hard to maintain temporal consistency.",
+      "desc": "Extending sets digitally using generative tools",
       "id": "d15",
       "name": "Gen Fill (Bg)",
       "tags": [
-        "Visual Effects",
-        "Production Design"
+        "Production Design",
+        "Visual Effects"
       ],
       "x": 74.9364,
       "y": 71.1636
     },
     "d16": {
-      "desc": "Generating foley or background music. Good for filler.",
+      "desc": "Generating foley with generative algorithms",
       "id": "d16",
       "name": "Text-to-SFX",
       "tags": [
@@ -182,19 +183,19 @@
       "y": 58.2446
     },
     "d17": {
-      "desc": "Generating 3D props. Topology usually needs manual cleanup.",
+      "desc": "Generating 3D props, sets, or characters from text prompts.",
       "id": "d17",
       "name": "Text-to-3D",
       "tags": [
         "Animation",
-        "Visual Effects",
-        "Production Design"
+        "Production Design",
+        "Visual Effects"
       ],
       "x": 92.0727,
       "y": 35.2455
     },
     "d18": {
-      "desc": "Sora/Gen-3. Dream-like visuals. Physics/Continuity break.",
+      "desc": "Creating video clips from text prompts (optionally with image or video input)",
       "id": "d18",
       "name": "Text-to-Video",
       "tags": [
@@ -259,7 +260,8 @@
       "name": "Cosmetic (de-aging)",
       "tags": [
         "Actors",
-        "Cinematographers"
+        "Cinematographers",
+        "Visual Effects"
       ],
       "x": 49.4,
       "y": 73.9
@@ -289,6 +291,11 @@
       "id": "user_item_1769881171416",
       "name": "Concept Art",
       "tags": [
+        "Cinematographers",
+        "Costume Designers",
+        "Directors",
+        "Makeup Artists and Hairstylists",
+        "Producers",
         "Production Design",
         "Visual Effects"
       ],
@@ -504,11 +511,6 @@
       }
     },
     "d06": {
-      "YKL5jdKqDba525cosjG5ao5w0Wl2": {
-        "username": "Rob",
-        "x": 33.3,
-        "y": 90.9
-      },
       "gAOpJXK3TTPYlISiKTwi02MuOl52": {
         "username": "Amber-Owl-790",
         "x": 32.6,
@@ -765,6 +767,11 @@
         "username": "Yellow-Dolphin-219",
         "x": 48.2,
         "y": 77.6
+      },
+      "YKL5jdKqDba525cosjG5ao5w0Wl2": {
+        "username": "Rob",
+        "x": 48.7,
+        "y": 84.6
       },
       "gAOpJXK3TTPYlISiKTwi02MuOl52": {
         "username": "Amber-Owl-790",

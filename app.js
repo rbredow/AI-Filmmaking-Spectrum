@@ -88,6 +88,16 @@ const INITIAL_SHOW_TIME = 8000; // 8 seconds on launch
 const isTouchDevice = () =>
     window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 const isMobile = () => window.innerWidth <= 600;
+const isMobileGraphExperience = () =>
+    isTouchDevice() &&
+    (window.innerWidth <= 600 ||
+        (window.innerHeight <= 500 && window.innerWidth <= 1000));
+
+const MOBILE_FAN_THRESHOLD = 32;
+const MOBILE_DRAG_THRESHOLD = 12;
+let mobileFanItemIds = [];
+let mobileGraphTapStart = null;
+let mobileLabelClampFrame = null;
 
 const COLORS = [
     "Pink",
@@ -351,10 +361,14 @@ function throttle(func, limit) {
 //   - Voting CLOSED -> render the committed snapshot (data/snapshot.json) once
 //                     and open no further Firebase connection. currentUser stays
 //                     null, which gates off every drag/vote/write path.
+//   - ?preview=1    -> render that same snapshot with an in-memory local voter so
+//                     the full drag/confirm UI can be reviewed without DB writes.
 // If the live check can't be reached we fall back to the snapshot's own flag,
 // so a network hiccup never strands us. ?live=1 always forces the live path.
 let isStaticMode = false;
 let staticSnapshot = null;
+let isLocalPreviewMode = false;
+const LOCAL_PREVIEW_UID = "local-mobile-preview";
 
 function ensureDisplayName() {
     // Reuse a previously chosen name (for display only — voting needs live mode)
@@ -367,7 +381,9 @@ function ensureDisplayName() {
 }
 
 async function boot() {
-    const forceLive = new URLSearchParams(window.location.search).has("live");
+    const params = new URLSearchParams(window.location.search);
+    const forceLive = params.has("live");
+    const forcePreview = params.has("preview");
 
     // Fetch the committed snapshot (static data) and the LIVE voting flag in
     // parallel. The settings read is a single read-only REST GET, not a
@@ -389,6 +405,18 @@ async function boot() {
         liveSettings != null
             ? liveSettings.votingEnabled === true
             : !!(snapshot && snapshot.settings && snapshot.settings.votingEnabled);
+
+    // Preview always stays on the committed snapshot, even if production voting
+    // happens to open while a phone review is in progress.
+    if (forcePreview) {
+        if (!snapshot) {
+            console.error("Local preview requires data/snapshot.json.");
+            showToast("Preview unavailable — snapshot missing");
+            return;
+        }
+        startStatic(snapshot, true);
+        return;
+    }
 
     // Go live when forced, when voting is open, or when there is no snapshot to
     // fall back on. Otherwise serve the committed snapshot frozen.
@@ -418,18 +446,24 @@ function startLive() {
     });
 }
 
-function startStatic(snapshot) {
-    // No Firebase auth: currentUser stays null, which gates off every drag/
-    // vote/write path. isAdmin is false too — admins use ?live=1 to manage.
+function startStatic(snapshot, enablePreview = false) {
+    // No Firebase auth. Normal static mode keeps currentUser null; preview uses
+    // a local-only identity whose writes are intercepted below. Admins use
+    // ?live=1 to manage production.
     isStaticMode = true;
+    isLocalPreviewMode = enablePreview;
     staticSnapshot = snapshot;
     baselineSnapshot = snapshot;
     isAdmin = false;
-    votingEnabled = !!(snapshot.settings && snapshot.settings.votingEnabled);
+    currentUser = enablePreview ? { uid: LOCAL_PREVIEW_UID } : null;
+    votingEnabled = enablePreview || !!(snapshot.settings && snapshot.settings.votingEnabled);
     addingEnabled = !!(snapshot.settings && snapshot.settings.addingEnabled);
     updateAdminUI();
     ensureDisplayName();
     initApp();
+    if (enablePreview) {
+        setTimeout(() => showToast("Local preview — nothing is published"), 250);
+    }
     setTimeout(() => {
         document.body.classList.remove("initial-load");
     }, 2000);
@@ -444,6 +478,16 @@ function updateUsernameUI() {
 
 async function updateAllUserVotes(newName) {
     if (!currentUser) return;
+    if (isLocalPreviewMode) {
+        const nextVotes = JSON.parse(JSON.stringify(previousData));
+        Object.values(nextVotes).forEach((votes) => {
+            if (votes?.[LOCAL_PREVIEW_UID]) {
+                votes[LOCAL_PREVIEW_UID].username = newName;
+            }
+        });
+        updateGraphFromData(nextVotes, document.getElementById("graph-container"));
+        return;
+    }
     const updates = {};
     let hasUpdates = false;
 
@@ -462,6 +506,49 @@ async function updateAllUserVotes(newName) {
             console.error("Failed to update usernames on votes", e);
         }
     }
+}
+
+function setPreviewVote(itemId, vote) {
+    const nextVotes = JSON.parse(JSON.stringify(previousData));
+    if (!nextVotes[itemId]) nextVotes[itemId] = {};
+    nextVotes[itemId][LOCAL_PREVIEW_UID] = vote;
+    updateGraphFromData(nextVotes, document.getElementById("graph-container"));
+}
+
+function removePreviewVote(itemId) {
+    const nextVotes = JSON.parse(JSON.stringify(previousData));
+    if (nextVotes[itemId]) {
+        delete nextVotes[itemId][LOCAL_PREVIEW_UID];
+        if (!Object.keys(nextVotes[itemId]).length) delete nextVotes[itemId];
+    }
+    updateGraphFromData(nextVotes, document.getElementById("graph-container"));
+}
+
+function saveVote(itemId, vote) {
+    if (isLocalPreviewMode) {
+        setPreviewVote(itemId, vote);
+        return Promise.resolve();
+    }
+    return set(ref(db, "votes/" + itemId + "/" + currentUser.uid), vote);
+}
+
+function updateVoteName(itemId, username) {
+    if (isLocalPreviewMode) {
+        const vote = previousData[itemId]?.[LOCAL_PREVIEW_UID];
+        if (vote) setPreviewVote(itemId, { ...vote, username });
+        return Promise.resolve();
+    }
+    return update(ref(db, "votes/" + itemId + "/" + currentUser.uid), {
+        username,
+    });
+}
+
+function deleteVote(itemId) {
+    if (isLocalPreviewMode) {
+        removePreviewVote(itemId);
+        return Promise.resolve();
+    }
+    return remove(ref(db, "votes/" + itemId + "/" + currentUser.uid));
 }
 
 function showUsernamePrompt() {
@@ -530,6 +617,7 @@ function initApp() {
     const toggleBtn = document.getElementById("view-mode-btn");
     if (toggleBtn) {
         toggleBtn.onclick = () => {
+            clearMobileFan();
             if (viewMode === "2D") {
                 viewMode = "1D";
                 toggleBtn.innerText = "1D";
@@ -650,6 +738,7 @@ function initApp() {
     // Re-bind Toggle (since we wiped innerHTML)
     document.getElementById("view-mode-btn").onclick = () => {
         const btn = document.getElementById("view-mode-btn");
+        clearMobileFan();
         if (viewMode === "2D") {
             viewMode = "1D";
             btn.innerText = "1D";
@@ -780,6 +869,7 @@ function initApp() {
     svgLayer.setAttribute("viewBox", "0 0 100 100");
     svgLayer.setAttribute("preserveAspectRatio", "none");
     container.appendChild(svgLayer);
+    setupMobileGraphInteractions(container);
 
     setupModalLogic();
     setupEditModalLogic();
@@ -848,7 +938,7 @@ function initApp() {
 
     function applySettings(settings) {
         const s = settings || { votingEnabled: true, addingEnabled: true };
-        votingEnabled = s.votingEnabled;
+        votingEnabled = isLocalPreviewMode || s.votingEnabled;
         addingEnabled = s.addingEnabled;
 
         const toggleVoting = document.getElementById("toggle-voting");
@@ -921,6 +1011,7 @@ function setupGlobalTouchHandlers() {
 
     // Handle orientation change
     window.addEventListener("orientationchange", () => {
+        clearMobileFan();
         setTimeout(() => {
             closeAllTooltips();
         }, 100);
@@ -931,7 +1022,18 @@ function setupGlobalTouchHandlers() {
     window.addEventListener("resize", () => {
         clearTimeout(resizeTimeout);
         resizeTimeout = setTimeout(() => {
+            clearMobileFan();
             closeAllTooltips();
+            if (isOnboardingActive) {
+                ONBOARD_TOOLS.forEach((tool, index) => {
+                    positionOnboardingCard(
+                        document.getElementById(`onboard-card-${index + 1}`),
+                        tool,
+                        index,
+                        onboardingStep === 2 ? 2 : 1,
+                    );
+                });
+            }
         }, 250);
     });
 }
@@ -1199,35 +1301,48 @@ function setupVoteConfirmModal() {
         isConfirmingVote = false;
         modal.style.display = "none";
         if (modal.dataset.itemId && currentUser) {
-            remove(ref(db, "votes/" + modal.dataset.itemId + "/" + currentUser.uid));
+            deleteVote(modal.dataset.itemId).catch((error) => {
+                console.error("Could not remove vote", error);
+            });
         }
     };
 
     submitBtn.onclick = async () => {
-        // If name input is visible, validate and save it
-        if (nameSection.style.display !== "none") {
-            const val = nameInput.value.trim();
-            if (!val) return alert("Please enter a username.");
+        submitBtn.disabled = true;
+        try {
+            // If name input is visible, validate and save it
+            if (nameSection.style.display !== "none") {
+                const val = nameInput.value.trim();
+                if (!val) {
+                    alert("Please enter a username.");
+                    return;
+                }
 
-            userDisplayName = val;
-            hasConfirmedName = true;
-            localStorage.setItem("voter_name", userDisplayName);
-            localStorage.setItem("voter_name_confirmed", "true");
-            updateUsernameUI();
+                // Do not claim success until the server accepts the final name.
+                if (modal.dataset.itemId && currentUser) {
+                    await updateVoteName(modal.dataset.itemId, val);
+                }
 
-            // Update the vote we just cast with the new name
-            if (modal.dataset.itemId && currentUser) {
-                update(
-                    ref(db, "votes/" + modal.dataset.itemId + "/" + currentUser.uid),
-                    {
-                        username: userDisplayName,
-                    },
-                );
+                userDisplayName = val;
+                hasConfirmedName = true;
+                localStorage.setItem("voter_name", userDisplayName);
+                localStorage.setItem("voter_name_confirmed", "true");
+                updateUsernameUI();
             }
-        }
 
-        isConfirmingVote = false;
-        modal.style.display = "none";
+            isConfirmingVote = false;
+            modal.style.display = "none";
+            showToast(
+                isLocalPreviewMode
+                    ? "✓ Preview updated — not published"
+                    : "✓ Vote recorded",
+            );
+        } catch (error) {
+            console.error("Could not confirm vote", error);
+            showToast("Couldn’t confirm vote — try again");
+        } finally {
+            submitBtn.disabled = false;
+        }
     };
 }
 
@@ -1245,8 +1360,14 @@ function createItemElements(container, item) {
 
     const label = document.createElement("div");
     label.className = "dot-label";
-    label.innerText = item.name;
     label.id = `label-${item.id}`;
+    const labelName = document.createElement("span");
+    labelName.className = "dot-label-name";
+    labelName.textContent = item.name;
+    const labelValues = document.createElement("span");
+    labelValues.className = "dot-label-values";
+    labelValues.textContent = `G ${Math.round(item.x)} · R ${Math.round(item.y)}`;
+    label.append(labelName, labelValues);
     updateLabelPosition(label, item.y);
     avgDot.appendChild(label);
 
@@ -1367,6 +1488,10 @@ function highlightItem(id) {
     // Highlight the panel row
     const row = document.getElementById(`panel-row-${id}`);
     if (row) row.classList.add("row-active");
+
+    if (isMobileGraphExperience()) {
+        scheduleMobileLabelClamp(document.getElementById("graph-container"));
+    }
 }
 
 function clearHighlight() {
@@ -1383,8 +1508,324 @@ function clearHighlight() {
     }
 }
 
+function mobileTruePoint(id, container) {
+    const dot = document.getElementById(`dot-${id}`);
+    if (!dot || !container) return null;
+    const realX = parseFloat(dot.dataset.realX);
+    const realY = parseFloat(dot.dataset.realY);
+    if (!Number.isFinite(realX) || !Number.isFinite(realY)) return null;
+    return {
+        x: (plotPct(realX) / 100) * container.clientWidth,
+        y:
+            viewMode === "1D"
+                ? container.clientHeight / 2
+                : (1 - plotPct(realY) / 100) * container.clientHeight,
+    };
+}
+
+function mobileDisplayedPoint(id, container) {
+    const dot = document.getElementById(`dot-${id}`);
+    if (!dot || !container) return null;
+    const rect = dot.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    return {
+        x: rect.left + rect.width / 2 - containerRect.left,
+        y: rect.top + rect.height / 2 - containerRect.top,
+    };
+}
+
+function nearestMobileItem(clientX, clientY, container, ids, maxDistance = 52) {
+    const containerRect = container.getBoundingClientRect();
+    const x = clientX - containerRect.left;
+    const y = clientY - containerRect.top;
+    let nearest = null;
+    let nearestDistance = maxDistance;
+
+    ids.forEach((id) => {
+        const dot = document.getElementById(`dot-${id}`);
+        if (!dot || dot.classList.contains("onboarding-hidden")) return;
+        const point = mobileDisplayedPoint(id, container);
+        if (!point) return;
+        const distance = Math.hypot(point.x - x, point.y - y);
+        if (distance < nearestDistance) {
+            nearest = id;
+            nearestDistance = distance;
+        }
+    });
+    return nearest;
+}
+
+function mobileCollisionCluster(seedId, container) {
+    const ids = [...renderedItems];
+    const points = new Map(
+        ids.map((id) => [id, mobileTruePoint(id, container)]),
+    );
+    const cluster = new Set([seedId]);
+    const queue = [seedId];
+
+    while (queue.length) {
+        const currentId = queue.shift();
+        const current = points.get(currentId);
+        if (!current) continue;
+        ids.forEach((candidateId) => {
+            if (cluster.has(candidateId)) return;
+            const candidate = points.get(candidateId);
+            if (
+                candidate &&
+                Math.hypot(current.x - candidate.x, current.y - candidate.y) <=
+                    MOBILE_FAN_THRESHOLD
+            ) {
+                cluster.add(candidateId);
+                queue.push(candidateId);
+            }
+        });
+    }
+
+    return [...cluster].sort((a, b) =>
+        (itemsCache[a]?.name || "").localeCompare(itemsCache[b]?.name || ""),
+    );
+}
+
+function removeMobileFanGraphics() {
+    if (!svgLayer) return;
+    svgLayer
+        .querySelectorAll(".mobile-fan-connector, .mobile-fan-origin")
+        .forEach((element) => element.remove());
+}
+
+function layoutMobileFan(container) {
+    if (!container || !mobileFanItemIds.length || !isMobileGraphExperience()) {
+        return;
+    }
+
+    removeMobileFanGraphics();
+    const points = mobileFanItemIds
+        .map((id) => ({ id, point: mobileTruePoint(id, container) }))
+        .filter(({ point }) => point);
+    if (!points.length) return;
+
+    container.classList.add("mobile-cluster-focus");
+    let focusLabel = container.querySelector(".mobile-cluster-focus-label");
+    if (!focusLabel) {
+        focusLabel = document.createElement("div");
+        focusLabel.className = "mobile-cluster-focus-label";
+        container.appendChild(focusLabel);
+    }
+    focusLabel.textContent = `Cluster detail · ${points.length} tools`;
+
+    // A compact grid gives every label a real horizontal cell. This behaves as
+    // a local magnified view without changing the meaning of the chart axes.
+    const columnLimit = 3;
+    const rows = Math.ceil(points.length / columnLimit);
+    const topY = rows === 1 ? container.clientHeight * 0.48 : Math.max(105, container.clientHeight * 0.3);
+    const bottomY = Math.min(container.clientHeight - 92, container.clientHeight * 0.68);
+
+    points.forEach(({ id, point }, index) => {
+        const dot = document.getElementById(`dot-${id}`);
+        if (!dot) return;
+        const row = Math.floor(index / columnLimit);
+        const rowStart = row * columnLimit;
+        const rowCount = Math.min(columnLimit, points.length - rowStart);
+        const column = index - rowStart;
+        const sideInset = rowCount === 3 ? 48 : 62;
+        const usableWidth = Math.max(1, container.clientWidth - sideInset * 2);
+        const targetX =
+            rowCount === 1
+                ? container.clientWidth / 2
+                : sideInset + (column / (rowCount - 1)) * usableWidth;
+        const targetY =
+            rows === 1
+                ? topY
+                : topY + (row / (rows - 1)) * (bottomY - topY);
+        dot.classList.remove(
+            "mobile-fan-collapsing",
+            "mobile-label-left",
+            "mobile-label-right",
+            "mobile-label-below",
+        );
+        dot.classList.add("mobile-fanned", "mobile-label-below");
+        dot.style.setProperty("--mobile-fan-x", `${targetX - point.x}px`);
+        dot.style.setProperty("--mobile-fan-y", `${targetY - point.y}px`);
+
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("class", "mobile-fan-connector");
+        line.setAttribute("x1", (point.x / container.clientWidth) * 100);
+        line.setAttribute("y1", (point.y / container.clientHeight) * 100);
+        line.setAttribute("x2", (targetX / container.clientWidth) * 100);
+        line.setAttribute("y2", (targetY / container.clientHeight) * 100);
+        svgLayer.appendChild(line);
+
+        const origin = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
+        origin.setAttribute("class", "mobile-fan-origin");
+        origin.setAttribute("cx", (point.x / container.clientWidth) * 100);
+        origin.setAttribute("cy", (point.y / container.clientHeight) * 100);
+        origin.setAttribute("rx", (7 / container.clientWidth) * 100);
+        origin.setAttribute("ry", (7 / container.clientHeight) * 100);
+        svgLayer.appendChild(origin);
+    });
+
+    scheduleMobileLabelClamp(container);
+}
+
+function clearMobileFan() {
+    if (!mobileFanItemIds.length) return;
+    const collapsingIds = [...mobileFanItemIds];
+    mobileFanItemIds = [];
+    removeMobileFanGraphics();
+    const container = document.getElementById("graph-container");
+    if (container) {
+        container.classList.remove("mobile-cluster-focus");
+        container.querySelector(".mobile-cluster-focus-label")?.remove();
+    }
+    collapsingIds.forEach((id) => {
+        const dot = document.getElementById(`dot-${id}`);
+        if (!dot) return;
+        dot.classList.add("mobile-fan-collapsing");
+        dot.style.setProperty("--mobile-fan-x", "0px");
+        dot.style.setProperty("--mobile-fan-y", "0px");
+        setTimeout(() => {
+            if (mobileFanItemIds.includes(id)) return;
+            dot.classList.remove(
+                "mobile-fanned",
+                "mobile-fan-collapsing",
+                "mobile-label-left",
+                "mobile-label-right",
+                "mobile-label-below",
+            );
+            dot.style.removeProperty("--mobile-fan-x");
+            dot.style.removeProperty("--mobile-fan-y");
+            dot.style.removeProperty("--mobile-label-x");
+            dot.style.removeProperty("--mobile-label-y");
+        }, 240);
+    });
+}
+
+function expandMobileFan(ids, container) {
+    clearMobileFan();
+    clearHighlight();
+    mobileFanItemIds = ids;
+    layoutMobileFan(container);
+    showToast(`${ids.length} tools here — choose one`);
+}
+
+function selectMobileItem(id) {
+    clearMobileFan();
+    highlightItem(id);
+    const row = document.getElementById(`panel-row-${id}`);
+    if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function scheduleMobileLabelClamp(container) {
+    if (!container || !isMobileGraphExperience()) return;
+    if (mobileLabelClampFrame) cancelAnimationFrame(mobileLabelClampFrame);
+    mobileLabelClampFrame = requestAnimationFrame(() => {
+        const containerRect = container.getBoundingClientRect();
+        const labels = container.querySelectorAll(
+            ".dot.mobile-fanned .dot-label, .dot.highlighted .dot-label",
+        );
+        labels.forEach((label) => {
+            label.style.setProperty("--mobile-label-x", "0px");
+            label.style.setProperty("--mobile-label-y", "0px");
+        });
+        requestAnimationFrame(() => {
+            labels.forEach((label) => {
+                const rect = label.getBoundingClientRect();
+                const padding = 8;
+                let x = 0;
+                let y = 0;
+                if (rect.left < containerRect.left + padding) {
+                    x += containerRect.left + padding - rect.left;
+                }
+                if (rect.right > containerRect.right - padding) {
+                    x -= rect.right - (containerRect.right - padding);
+                }
+                if (rect.top < containerRect.top + padding) {
+                    y += containerRect.top + padding - rect.top;
+                }
+                if (rect.bottom > containerRect.bottom - padding) {
+                    y -= rect.bottom - (containerRect.bottom - padding);
+                }
+                label.style.setProperty("--mobile-label-x", `${x}px`);
+                label.style.setProperty("--mobile-label-y", `${y}px`);
+            });
+        });
+    });
+}
+
+function setupMobileGraphInteractions(container) {
+    const isInteractiveChrome = (target) =>
+        target instanceof Element &&
+        target.closest(
+            "#top-right-controls, .tooltip, .onboarding-overlay, button, input, a",
+        );
+
+    container.addEventListener(
+        "touchstart",
+        (event) => {
+            if (
+                !isMobileGraphExperience() ||
+                event.touches.length !== 1 ||
+                isInteractiveChrome(event.target)
+            ) {
+                mobileGraphTapStart = null;
+                return;
+            }
+            const touch = event.touches[0];
+            mobileGraphTapStart = {
+                x: touch.clientX,
+                y: touch.clientY,
+                time: Date.now(),
+            };
+        },
+        { passive: true },
+    );
+
+    container.addEventListener(
+        "touchend",
+        (event) => {
+            const start = mobileGraphTapStart;
+            mobileGraphTapStart = null;
+            if (!start || !isMobileGraphExperience() || isDragging) return;
+            const touch = event.changedTouches[0];
+            if (!touch) return;
+            const movement = Math.hypot(touch.clientX - start.x, touch.clientY - start.y);
+            if (movement > MOBILE_DRAG_THRESHOLD || Date.now() - start.time > 450) return;
+
+            event.preventDefault();
+            if (mobileFanItemIds.length) {
+                const selectedId = nearestMobileItem(
+                    touch.clientX,
+                    touch.clientY,
+                    container,
+                    mobileFanItemIds,
+                    48,
+                );
+                if (selectedId) selectMobileItem(selectedId);
+                else clearMobileFan();
+                return;
+            }
+
+            const nearestId = nearestMobileItem(
+                touch.clientX,
+                touch.clientY,
+                container,
+                [...renderedItems],
+            );
+            if (!nearestId) {
+                clearHighlight();
+                return;
+            }
+            const cluster = mobileCollisionCluster(nearestId, container);
+            if (cluster.length > 1) expandMobileFan(cluster, container);
+            else selectMobileItem(nearestId);
+        },
+        { passive: false },
+    );
+}
+
 // --- FILTER AND REORDER LOGIC ---
 function applyFilters(options = {}) {
+    clearMobileFan();
     const searchInput = document.getElementById("search-input");
     const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
     const container = document.getElementById("graph-container");
@@ -1550,6 +1991,7 @@ function renderToolPanel() {
         });
         row.addEventListener("click", () => {
             // Tap: keep highlight until another is chosen
+            clearMobileFan();
             highlightItem(item.id);
         });
 
@@ -1571,6 +2013,7 @@ function setupTapTooltip(avgDot, item) {
     avgDot.addEventListener(
         "touchstart",
         (e) => {
+            if (isMobileGraphExperience()) return;
             tapStartTime = Date.now();
             tapStartX = e.touches[0].clientX;
             tapStartY = e.touches[0].clientY;
@@ -1579,6 +2022,7 @@ function setupTapTooltip(avgDot, item) {
     );
 
     avgDot.addEventListener("touchend", (e) => {
+        if (isMobileGraphExperience()) return;
         const tapDuration = Date.now() - tapStartTime;
         const touch = e.changedTouches[0];
         const moveX = Math.abs(touch.clientX - tapStartX);
@@ -1625,7 +2069,8 @@ function setupTapTooltip(avgDot, item) {
 
 function updateItemMetadata(item) {
     const label = document.getElementById(`label-${item.id}`);
-    if (label) label.innerText = item.name;
+    const labelName = label?.querySelector(".dot-label-name");
+    if (labelName) labelName.textContent = item.name;
     const tooltip = document.getElementById(`tooltip-${item.id}`);
     if (tooltip) {
         const titleStrong = tooltip.querySelector("strong");
@@ -1648,6 +2093,7 @@ function updateItemMetadata(item) {
 }
 
 function removeItemElements(id) {
+    if (mobileFanItemIds.includes(id)) clearMobileFan();
     const dot = document.getElementById(`dot-${id}`);
     const uDot = document.getElementById(`user-dot-${id}`);
     const line = document.getElementById(`line-${id}`);
@@ -1682,14 +2128,14 @@ function setupDrag(avgDot, userDot, item, container) {
                     else targetY = item.y;
                 }
             }
-            set(ref(db, "votes/" + item.id + "/" + currentUser.uid), {
+            saveVote(item.id, {
                 x: Math.round(x * 10) / 10,
                 y: Math.round(targetY * 10) / 10,
                 username: userDisplayName,
                 timestamp: Date.now(),
             });
         } else {
-            set(ref(db, "votes/" + item.id + "/" + currentUser.uid), {
+            saveVote(item.id, {
                 x: Math.round(x * 10) / 10,
                 y: Math.round(y * 10) / 10,
                 username: userDisplayName,
@@ -1788,7 +2234,7 @@ function setupDrag(avgDot, userDot, item, container) {
             }
         }
 
-        function endDrag() {
+        async function endDrag() {
             document.removeEventListener("mousemove", onMouseMove);
             document.onmouseup = null;
             document.removeEventListener("touchmove", onTouchMove);
@@ -1804,6 +2250,8 @@ function setupDrag(avgDot, userDot, item, container) {
                 if (activeDot.dataset.tempX) {
                     let x = parseFloat(activeDot.dataset.tempX);
                     let y = parseFloat(activeDot.dataset.tempY);
+                    delete activeDot.dataset.tempX;
+                    delete activeDot.dataset.tempY;
                     if (viewMode === "1D") {
                         let targetY = 50;
                         const itemVotes = previousData[item.id] || {};
@@ -1820,15 +2268,25 @@ function setupDrag(avgDot, userDot, item, container) {
                         y = targetY;
                     }
 
-                    set(ref(db, "votes/" + item.id + "/" + currentUser.uid), {
-                        x: Math.round(x * 10) / 10,
-                        y: Math.round(y * 10) / 10,
-                        username: userDisplayName,
-                        timestamp: Date.now(),
-                    });
+                    isConfirmingVote = true;
+                    showToast(
+                        isLocalPreviewMode ? "Updating local preview…" : "Saving vote…",
+                    );
+                    try {
+                        await saveVote(item.id, {
+                            x: Math.round(x * 10) / 10,
+                            y: Math.round(y * 10) / 10,
+                            username: userDisplayName,
+                            timestamp: Date.now(),
+                        });
+                    } catch (error) {
+                        console.error("Could not save vote", error);
+                        isConfirmingVote = false;
+                        showToast("Couldn’t confirm final position — try again");
+                        return;
+                    }
 
                     // --- SHOW CONFIRMATION MODAL ---
-                    isConfirmingVote = true;
                     const modal = document.getElementById("confirm-vote-modal");
                     const title = document.getElementById("confirm-vote-title");
                     const stats = document.getElementById("confirm-vote-stats");
@@ -1905,9 +2363,19 @@ function setupDrag(avgDot, userDot, item, container) {
                 const touch = e.touches[0];
                 const moveX = Math.abs(touch.clientX - avgDot._touchStartX);
                 const moveY = Math.abs(touch.clientY - avgDot._touchStartY);
+                const dragThreshold = isMobileGraphExperience()
+                    ? MOBILE_DRAG_THRESHOLD
+                    : 5;
 
                 // If moved enough, start dragging
-                if (moveX > 5 || moveY > 5) {
+                if (moveX > dragThreshold || moveY > dragThreshold) {
+                    if (
+                        isMobileGraphExperience() &&
+                        (_currentHighlightId !== item.id || mobileFanItemIds.length)
+                    ) {
+                        avgDot._touchStartTime = null;
+                        return;
+                    }
                     if (!isDragging) {
                         startDrag(touch.clientX, touch.clientY, avgDot, e);
                     }
@@ -1938,9 +2406,12 @@ function setupDrag(avgDot, userDot, item, container) {
                 const touch = e.touches[0];
                 const moveX = Math.abs(touch.clientX - userDot._touchStartX);
                 const moveY = Math.abs(touch.clientY - userDot._touchStartY);
+                const dragThreshold = isMobileGraphExperience()
+                    ? MOBILE_DRAG_THRESHOLD
+                    : 5;
 
                 // If moved enough, start dragging
-                if (moveX > 5 || moveY > 5) {
+                if (moveX > dragThreshold || moveY > dragThreshold) {
                     if (!isDragging) {
                         startDrag(touch.clientX, touch.clientY, userDot, e);
                     }
@@ -2072,6 +2543,10 @@ function updateGraphFromData(allVotes, container) {
             updateDotColor(avgDot, avgY);
             const label = document.getElementById(`label-${itemId}`);
             if (label) updateLabelPosition(label, avgY);
+            const labelValues = label?.querySelector(".dot-label-values");
+            if (labelValues) {
+                labelValues.textContent = `G ${Math.round(avgX)} · R ${Math.round(avgY)}`;
+            }
 
             // UPDATE TOOLTIP VALUES
             const valX = document.getElementById(`val-x-${itemId}`);
@@ -2172,6 +2647,10 @@ function updateGraphFromData(allVotes, container) {
 
     // After all dots have moved, schedule label de-overlap pass
     scheduleResolveLabels();
+    if (isMobileGraphExperience()) {
+        if (mobileFanItemIds.length) layoutMobileFan(container);
+        else scheduleMobileLabelClamp(container);
+    }
 }
 
 function updateConnectionLine(itemId, x1, y1, x2, y2) {
@@ -2419,7 +2898,7 @@ window.resetVotes = (id) => {
 
 window.editItem = (id) => {
     const modal = document.getElementById("edit-item-modal");
-    const name = document.getElementById(`label-${id}`).innerText;
+    const name = document.querySelector(`#label-${id} .dot-label-name`)?.innerText || "";
     const desc = document.getElementById(`desc-${id}`).innerText;
     const item = itemsCache[id];
     
@@ -2977,6 +3456,23 @@ const ONBOARD_TOOLS = [
     },
 ];
 
+function positionOnboardingCard(card, tool, index, step) {
+    if (!card) return;
+    const usePhoneLayout = isMobileGraphExperience();
+    const mobileX = [17, 50, 83][index];
+    const mobileY = [82, 55, 20][index];
+    const x = usePhoneLayout ? mobileX : tool.x;
+    const y = step === 1 ? (usePhoneLayout ? 42 : 44) : (usePhoneLayout ? mobileY : tool.y);
+
+    card.style.left = `${x}%`;
+    card.style.bottom = `${y}%`;
+    card.classList.remove("card-left", "card-right");
+    if (!usePhoneLayout) {
+        if (x < 15) card.classList.add("card-left");
+        else if (x > 85) card.classList.add("card-right");
+    }
+}
+
 let onboardingTimers = [];
 let isStepAnimating = false;
 
@@ -3004,10 +3500,7 @@ function fastForwardCurrentStep() {
             const card = document.getElementById(`onboard-card-${index + 1}`);
             if (card) {
                 card.className = "onboard-sample-card visible";
-                card.style.left = `${tool.x}%`;
-                card.style.bottom = "44%";
-                if (tool.x < 15) card.classList.add("card-left");
-                else if (tool.x > 85) card.classList.add("card-right");
+                positionOnboardingCard(card, tool, index, 1);
             }
         });
 
@@ -3021,10 +3514,7 @@ function fastForwardCurrentStep() {
             const card = document.getElementById(`onboard-card-${index + 1}`);
             if (card) {
                 card.className = "onboard-sample-card visible";
-                card.style.left = `${tool.x}%`;
-                card.style.bottom = `${tool.y}%`;
-                if (tool.x < 15) card.classList.add("card-left");
-                else if (tool.x > 85) card.classList.add("card-right");
+                positionOnboardingCard(card, tool, index, 2);
             }
         });
 
@@ -3079,6 +3569,7 @@ function startOnboarding(force = false) {
     const panel = document.getElementById("tool-panel-inner");
     const sidebar = document.getElementById("onboard-sidebar-panel");
     if (!overlay || !container) return;
+    document.body.classList.add("onboarding-active");
 
     overlay.style.display = "block";
     overlay.style.opacity = "1";
@@ -3145,10 +3636,7 @@ function renderOnboardingStep1() {
         const card = document.getElementById(`onboard-card-${index + 1}`);
         if (card) {
             card.className = "onboard-sample-card";
-            card.style.left = `${tool.x}%`;
-            card.style.bottom = "44%";
-            if (tool.x < 15) card.classList.add("card-left");
-            else if (tool.x > 85) card.classList.add("card-right");
+            positionOnboardingCard(card, tool, index, 1);
         }
     });
 
@@ -3269,19 +3757,19 @@ function renderOnboardingStep2() {
     // Tool 1: Denoising Sound rises to 94.9% at 1.5s
     addOnboardingTimer(() => {
         const card1 = document.getElementById("onboard-card-1");
-        if (card1) card1.style.bottom = `${ONBOARD_TOOLS[0].y}%`;
+        positionOnboardingCard(card1, ONBOARD_TOOLS[0], 0, 2);
     }, 1500);
 
     // Tool 2: Character In-Betweening glides to 61.3% at 2.2s
     addOnboardingTimer(() => {
         const card2 = document.getElementById("onboard-card-2");
-        if (card2) card2.style.bottom = `${ONBOARD_TOOLS[1].y}%`;
+        positionOnboardingCard(card2, ONBOARD_TOOLS[1], 1, 2);
     }, 2200);
 
     // Tool 3: Idea to Script glides to 10.8% at 2.9s
     addOnboardingTimer(() => {
         const card3 = document.getElementById("onboard-card-3");
-        if (card3) card3.style.bottom = `${ONBOARD_TOOLS[2].y}%`;
+        positionOnboardingCard(card3, ONBOARD_TOOLS[2], 2, 2);
     }, 2900);
 
     // Phase 4 (3.8s): Sidebar card fades up
@@ -3335,6 +3823,7 @@ function completeOnboarding() {
             overlay.style.opacity = "0";
             setTimeout(() => {
                 overlay.style.display = "none";
+                document.body.classList.remove("onboarding-active");
             }, 500);
         }
     }, 400);
@@ -3349,6 +3838,7 @@ function completeOnboarding() {
 
 function skipOnboarding() {
     clearOnboardingTimers();
+    document.body.classList.remove("onboarding-active");
     const overlay = document.getElementById("onboarding-overlay");
     const container = document.getElementById("graph-container");
     const panel = document.getElementById("tool-panel-inner");
@@ -3512,4 +4002,3 @@ document.addEventListener("click", (e) => {
     if (inMenu && !isAction) return;
     header.classList.remove("settings-open");
 });
-

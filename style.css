@@ -1113,6 +1113,10 @@ p {
     pointer-events: none;
 }
 
+.mobile-zoom-controls {
+    display: none;
+}
+
 /* --- SPLASH ANIMATION --- */
 .splash {
     position: absolute;
@@ -2411,7 +2415,9 @@ button:active {
     .dot.mobile-fan-collapsing {
         translate: var(--mobile-fan-x, 0px) var(--mobile-fan-y, 0px);
         transition:
-            translate 0.24s cubic-bezier(0.2, 0.8, 0.2, 1),
+            left 0.34s cubic-bezier(0.2, 0.8, 0.2, 1),
+            bottom 0.34s cubic-bezier(0.2, 0.8, 0.2, 1),
+            translate 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
             width 0.15s ease,
             height 0.15s ease,
             box-shadow 0.15s ease,
@@ -2448,8 +2454,9 @@ button:active {
     .dot.mobile-fanned .dot-label {
         display: block;
         opacity: 1;
-        max-width: min(112px, calc((100vw - 24px) / 3));
+        max-width: min(132px, calc(100vw - 32px));
         text-wrap: balance;
+        animation: mobile-fan-label-in 0.18s ease 0.22s both;
     }
 
     .dot.highlighted .dot-label-values {
@@ -2509,6 +2516,49 @@ button:active {
             inset 0 0 80px rgba(37, 99, 235, 0.08);
     }
 
+    #graph-container.mobile-graph-zoomed .axis-label,
+    #graph-container.mobile-graph-zoomed .grid-line,
+    #graph-container.mobile-graph-zoomed .y-axis-gradient {
+        opacity: 0.16 !important;
+    }
+
+    #graph-container.mobile-graph-zoomed {
+        overflow: hidden;
+    }
+
+    #graph-container.mobile-view-animating .dot,
+    #graph-container.mobile-view-animating .user-dot,
+    #graph-container.mobile-view-animating .voter-dot {
+        transition:
+            left 0.34s cubic-bezier(0.2, 0.8, 0.2, 1),
+            bottom 0.34s cubic-bezier(0.2, 0.8, 0.2, 1),
+            translate 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+            width 0.15s ease,
+            height 0.15s ease,
+            box-shadow 0.15s ease !important;
+    }
+
+    #graph-container.mobile-view-manipulating .dot,
+    #graph-container.mobile-view-manipulating .user-dot,
+    #graph-container.mobile-view-manipulating .voter-dot {
+        transition: none !important;
+    }
+
+    .mobile-fan-connector,
+    .mobile-fan-origin {
+        animation: mobile-fan-guide-in 0.16s ease 0.24s both;
+    }
+
+    @keyframes mobile-fan-guide-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @keyframes mobile-fan-label-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
     #graph-container.mobile-cluster-focus .dot:not(.mobile-fanned),
     #graph-container.mobile-cluster-focus .user-dot,
     #graph-container.mobile-cluster-focus .voter-dot,
@@ -2536,6 +2586,51 @@ button:active {
         white-space: nowrap;
         pointer-events: none;
         box-shadow: 0 6px 18px rgba(0, 0, 0, 0.48);
+    }
+
+    .mobile-zoom-controls {
+        position: absolute;
+        top: 7px;
+        right: 8px;
+        z-index: 640;
+        display: inline-flex;
+        align-items: center;
+        overflow: hidden;
+        border: 1px solid #3a3a3a;
+        border-radius: 9px;
+        background: rgba(9, 12, 17, 0.9);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+    }
+
+    .mobile-zoom-controls button {
+        min-width: 34px;
+        height: 32px;
+        margin: 0;
+        padding: 0 8px;
+        border: 0;
+        border-right: 1px solid #303030;
+        border-radius: 0;
+        background: transparent;
+        color: #d1d5db;
+        font-size: var(--fs-sm);
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .mobile-zoom-controls button:last-child {
+        border-right: 0;
+    }
+
+    .mobile-zoom-controls .mobile-zoom-readout {
+        min-width: 42px;
+        color: #93c5fd;
+        font-size: var(--fs-xs);
+    }
+
+    #graph-container.mobile-graph-zoomed .mobile-zoom-controls {
+        border-color: rgba(59, 130, 246, 0.7);
     }
 }
 
@@ -3382,6 +3477,10 @@ input:checked+.slider:before {
         visibility: hidden;
     }
 
+    body.onboarding-active .mobile-zoom-controls {
+        visibility: hidden;
+    }
+
     .onboard-hero-word {
         font-size: clamp(16px, 4.5vw, 24px);
     }
@@ -3482,6 +3581,10 @@ input:checked+.slider:before {
 
 @media (hover: none) and (pointer: coarse) and (max-width: 1000px) and (max-height: 500px) {
     body.onboarding-active #top-right-controls {
+        visibility: hidden;
+    }
+
+    body.onboarding-active .mobile-zoom-controls {
         visibility: hidden;
     }
 

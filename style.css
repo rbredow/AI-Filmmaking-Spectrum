@@ -2634,6 +2634,19 @@ button:active {
     }
 }
 
+/* Landscape keeps the app controls in the graph, so reserve the opposite
+   corner for graph navigation instead of stacking both control groups. */
+@media (hover: none) and (pointer: coarse) and (max-width: 1000px) and (max-height: 500px) {
+    .mobile-zoom-controls {
+        right: auto;
+        left: 8px;
+    }
+
+    .mobile-cluster-focus-label {
+        top: 46px;
+    }
+}
+
 /* ========================================= */
 /*        TOUCH DEVICE OPTIMIZATIONS        */
 /* ========================================= */

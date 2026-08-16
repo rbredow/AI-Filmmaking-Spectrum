@@ -1636,7 +1636,7 @@ function resetMobileGraphView(container, animate = true) {
     applyMobileGraphView(container, { animate });
 }
 
-function focusMobileGraphOnCluster(ids, container) {
+function focusMobileGraphOnCluster(ids, container, minimumScale = 2.2) {
     const points = ids
         .map((id) => {
             const dot = document.getElementById(`dot-${id}`);
@@ -1651,7 +1651,7 @@ function focusMobileGraphOnCluster(ids, container) {
     if (!points.length) return;
     const centerX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
     const centerY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
-    mobileGraphView.scale = Math.max(mobileGraphView.scale, 2.2);
+    mobileGraphView.scale = Math.max(mobileGraphView.scale, minimumScale);
     mobileGraphView.offsetX = container.clientWidth / 2 - centerX * mobileGraphView.scale;
     mobileGraphView.offsetY = container.clientHeight / 2 - centerY * mobileGraphView.scale;
     applyMobileGraphView(container, { animate: true });
@@ -1912,6 +1912,13 @@ function expandMobileFan(ids, container) {
 
 function selectMobileItem(id) {
     clearMobileFan();
+    const container = document.getElementById("graph-container");
+    if (container && isMobileGraphExperience()) {
+        // A lone point should get the same spatial focus as a cluster, just at a
+        // gentler zoom so its surrounding context remains visible. Selecting a
+        // point from an already-zoomed fan preserves the stronger cluster zoom.
+        focusMobileGraphOnCluster([id], container, 1.65);
+    }
     highlightItem(id);
     const row = document.getElementById(`panel-row-${id}`);
     if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });

@@ -137,6 +137,37 @@ p {
     -webkit-overflow-scrolling: touch;
 }
 
+#tool-panel-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    padding: 11px 14px 10px;
+    background: rgba(13, 13, 13, 0.96);
+    border-bottom: 1px solid #2a2a2a;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.24);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+#tool-panel-header h3 {
+    margin: 0 0 2px;
+    color: #f3f4f6;
+    font-size: var(--fs-lg);
+    font-weight: 700;
+    letter-spacing: 0.2px;
+}
+
+#tool-panel-header p {
+    margin: 0;
+    color: #888;
+    font-size: var(--fs-xs);
+    line-height: 1.35;
+}
+
+body.onboarding-active #tool-panel-header {
+    display: none;
+}
+
 #tool-panel-inner {
     padding: 8px 0;
 }
@@ -338,6 +369,25 @@ p {
     transition: opacity 3s;
 }
 
+.x-axis-gradient {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 3px;
+    z-index: 2;
+    height: 3px;
+    border-radius: 2px;
+    background: linear-gradient(
+        to right,
+        #64748b 0%,
+        #3b82f6 58%,
+        #8b5cf6 100%
+    );
+    opacity: 0.72;
+    pointer-events: none;
+    transition: opacity 3s;
+}
+
 /* Axis Labels */
 .axis-label {
     position: absolute;
@@ -354,11 +404,13 @@ p {
 .x-label-left {
     bottom: -40px;
     left: 0;
+    color: #94a3b8;
 }
 
 .x-label-right {
     bottom: -40px;
     right: 0;
+    color: #a78bfa;
 }
 
 .y-label-top {
@@ -2531,7 +2583,8 @@ button:active {
 
     #graph-container.mobile-graph-zoomed .axis-label,
     #graph-container.mobile-graph-zoomed .grid-line,
-    #graph-container.mobile-graph-zoomed .y-axis-gradient {
+    #graph-container.mobile-graph-zoomed .y-axis-gradient,
+    #graph-container.mobile-graph-zoomed .x-axis-gradient {
         opacity: 0.16 !important;
     }
 
@@ -2775,6 +2828,7 @@ button:active {
     .voter-dot,
     .tooltip,
     .y-axis-gradient,
+    .x-axis-gradient,
     .axis-label,
     .grid-line,
     #graph-container {

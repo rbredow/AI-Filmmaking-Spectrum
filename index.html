@@ -17,7 +17,7 @@
     <!-- Prevent phone number detection -->
     <meta name="format-detection" content="telephone=no" />
 
-    <link rel="stylesheet" href="style.css?v=2.16" />
+    <link rel="stylesheet" href="style.css?v=2.17" />
 </head>
 
 <body class="initial-load">
@@ -49,6 +49,7 @@
     <div id="main-layout">
         <div id="graph-container">
             <div class="y-axis-gradient"></div>
+            <div class="x-axis-gradient"></div>
             <div class="grid-line grid-x" style="bottom: 50%"></div>
             <div class="grid-line grid-y" style="left: 50%"></div>
 
@@ -172,6 +173,10 @@
                     <button id="onboard-skip-btn" type="button" class="onboard-btn-ghost">Skip</button>
                 </div>
             </div>
+            <header id="tool-panel-header">
+                <h3>Tool Directory</h3>
+                <p>Tap a tool to locate it on the spectrum.</p>
+            </header>
             <div id="tool-panel-inner"></div>
         </div>
     </div>
@@ -434,7 +439,7 @@
                 }
             }
         </script>
-    <script type="module" src="app.js?v=2.16"></script>
+    <script type="module" src="app.js?v=2.17"></script>
 </body>
 
 </html>

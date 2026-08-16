@@ -640,7 +640,7 @@ function initApp() {
 
     container.innerHTML = `
         <div class="y-axis-gradient"></div>
-        <div class="x-axis-gradient"></div>
+        <div class="x-axis-guide"></div>
         <div class="grid-line grid-x" style="bottom: 50%"></div>
         <div class="grid-line grid-y" style="left: 50%"></div>
         <div class="axis-label x-label-left">← Algorithmic / Utility</div>

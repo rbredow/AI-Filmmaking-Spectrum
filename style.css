@@ -2538,6 +2538,13 @@ button:active {
             box-shadow 0.15s ease !important;
     }
 
+    /* The graph can zoom out as a vote drag begins, but the marker under the
+       finger must remain direct and must never inherit the viewport animation. */
+    #graph-container.mobile-view-animating .dot.dragging,
+    #graph-container.mobile-view-animating .user-dot.dragging {
+        transition: none !important;
+    }
+
     #graph-container.mobile-view-manipulating .dot,
     #graph-container.mobile-view-manipulating .user-dot,
     #graph-container.mobile-view-manipulating .voter-dot {

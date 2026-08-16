@@ -2555,12 +2555,11 @@ function setupDrag(avgDot, userDot, item, container) {
             originalEvent.stopPropagation();
         }
 
-        if (isMobileGraphExperience() && mobileFanItemIds.includes(item.id)) {
-            // Moving a fanned point is an explicit vote gesture. Collapse the
-            // chooser, keep the focused viewport stable, and hand the same
-            // touch directly to the drag interaction without a second tap.
-            clearMobileFan();
-            mobileFocusedClusterIds = [item.id];
+        if (isMobileGraphExperience() && mobileGraphView.scale > 1.01) {
+            // Once the user commits to moving a point, restore the full graph so
+            // the entire voting range is visible. Do this before mapping the
+            // touch so the dragged vote uses stable 1x graph coordinates.
+            resetMobileGraphView(container, true);
             highlightItem(item.id);
         }
 

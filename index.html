@@ -17,7 +17,7 @@
     <!-- Prevent phone number detection -->
     <meta name="format-detection" content="telephone=no" />
 
-    <link rel="stylesheet" href="style.css?v=2.18" />
+    <link rel="stylesheet" href="style.css?v=2.19" />
 </head>
 
 <body class="initial-load">
@@ -64,10 +64,6 @@
                 <div id="branch-filter-container">
                     <div id="branch-filter-btn" title="Filter by Branch">Branch ▾</div>
                     <div id="branch-filter-dropdown" style="display: none;"></div>
-                </div>
-                <div id="search-container">
-                    <span id="search-icon">🔍</span>
-                    <input type="search" id="search-input" placeholder="Search..." enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
                 </div>
             </div>
 
@@ -174,8 +170,11 @@
                 </div>
             </div>
             <header id="tool-panel-header">
-                <h3>Tool Directory</h3>
-                <p>Tap a tool to locate it on the spectrum.</p>
+                <h3>AI Tool Directory</h3>
+                <div id="search-container">
+                    <span id="search-icon">🔍</span>
+                    <input type="search" id="search-input" placeholder="Search tools" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+                </div>
             </header>
             <div id="tool-panel-inner"></div>
         </div>
@@ -439,7 +438,7 @@
                 }
             }
         </script>
-    <script type="module" src="app.js?v=2.18"></script>
+    <script type="module" src="app.js?v=2.19"></script>
 </body>
 
 </html>

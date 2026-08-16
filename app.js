@@ -655,10 +655,6 @@ function initApp() {
                 <div id="branch-filter-btn" title="Filter by Branch">Branch ▾</div>
                 <div id="branch-filter-dropdown" style="display: none;"></div>
             </div>
-            <div id="search-container">
-                <span id="search-icon">🔍</span>
-                <input type="search" id="search-input" placeholder="Search..." enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-            </div>
         </div>
         <!-- TIMELINE SCRUBBER OVERLAY -->
         <div id="timeline-bar" class="timeline-bar" style="display: none;">

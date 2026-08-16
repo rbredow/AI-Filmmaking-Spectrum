@@ -1960,28 +1960,29 @@ function scheduleMobileLabelClamp(container) {
             label.style.setProperty("--mobile-label-x", "0px");
             label.style.setProperty("--mobile-label-y", "0px");
         });
-        requestAnimationFrame(() => {
-            labels.forEach((label) => {
-                const rect = label.getBoundingClientRect();
-                const padding = 8;
-                const topPadding = mobileGraphView.scale > 1.01 ? 48 : padding;
-                let x = 0;
-                let y = 0;
-                if (rect.left < containerRect.left + padding) {
-                    x += containerRect.left + padding - rect.left;
-                }
-                if (rect.right > containerRect.right - padding) {
-                    x -= rect.right - (containerRect.right - padding);
-                }
-                if (rect.top < containerRect.top + topPadding) {
-                    y += containerRect.top + topPadding - rect.top;
-                }
-                if (rect.bottom > containerRect.bottom - padding) {
-                    y -= rect.bottom - (containerRect.bottom - padding);
-                }
-                label.style.setProperty("--mobile-label-x", `${x}px`);
-                label.style.setProperty("--mobile-label-y", `${y}px`);
-            });
+        // getBoundingClientRect forces layout after the zeroed offsets, letting
+        // us apply the bounded values before this animation frame is painted.
+        // A nested frame here caused the label to flash unclamped during drag.
+        labels.forEach((label) => {
+            const rect = label.getBoundingClientRect();
+            const padding = 8;
+            const topPadding = mobileGraphView.scale > 1.01 ? 48 : padding;
+            let x = 0;
+            let y = 0;
+            if (rect.left < containerRect.left + padding) {
+                x += containerRect.left + padding - rect.left;
+            }
+            if (rect.right > containerRect.right - padding) {
+                x -= rect.right - (containerRect.right - padding);
+            }
+            if (rect.top < containerRect.top + topPadding) {
+                y += containerRect.top + topPadding - rect.top;
+            }
+            if (rect.bottom > containerRect.bottom - padding) {
+                y -= rect.bottom - (containerRect.bottom - padding);
+            }
+            label.style.setProperty("--mobile-label-x", `${x}px`);
+            label.style.setProperty("--mobile-label-y", `${y}px`);
         });
     });
 }

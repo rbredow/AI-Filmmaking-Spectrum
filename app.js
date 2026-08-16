@@ -2555,6 +2555,15 @@ function setupDrag(avgDot, userDot, item, container) {
             originalEvent.stopPropagation();
         }
 
+        if (isMobileGraphExperience() && mobileFanItemIds.includes(item.id)) {
+            // Moving a fanned point is an explicit vote gesture. Collapse the
+            // chooser, keep the focused viewport stable, and hand the same
+            // touch directly to the drag interaction without a second tap.
+            clearMobileFan();
+            mobileFocusedClusterIds = [item.id];
+            highlightItem(item.id);
+        }
+
         isDragging = item.id;
         const activeDot = userDot;
         activeDot.style.display = "block";
@@ -2753,15 +2762,19 @@ function setupDrag(avgDot, userDot, item, container) {
                 const touch = e.touches[0];
                 const moveX = Math.abs(touch.clientX - avgDot._touchStartX);
                 const moveY = Math.abs(touch.clientY - avgDot._touchStartY);
-                const dragThreshold = isMobileGraphExperience()
-                    ? MOBILE_DRAG_THRESHOLD
-                    : 5;
+                const isFannedChoice = mobileFanItemIds.includes(item.id);
+                const dragThreshold = isFannedChoice
+                    ? 8
+                    : isMobileGraphExperience()
+                      ? MOBILE_DRAG_THRESHOLD
+                      : 5;
 
                 // If moved enough, start dragging
                 if (moveX > dragThreshold || moveY > dragThreshold) {
                     if (
                         isMobileGraphExperience() &&
-                        (_currentHighlightId !== item.id || mobileFanItemIds.length)
+                        _currentHighlightId !== item.id &&
+                        !mobileFanItemIds.includes(item.id)
                     ) {
                         avgDot._touchStartTime = null;
                         return;

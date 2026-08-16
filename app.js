@@ -104,6 +104,7 @@ let mobileLabelClampFrame = null;
 let mobileViewportGesture = null;
 let mobileViewAnimationTimer = null;
 const mobileGraphView = { scale: 1, offsetX: 0, offsetY: 0 };
+let mobileGraphReturnView = null;
 
 const COLORS = [
     "Pink",
@@ -1630,10 +1631,31 @@ function setMobileGraphZoom(container, nextScale, focalX, focalY, animate = fals
 function resetMobileGraphView(container, animate = true) {
     clearMobileFan();
     mobileFocusedClusterIds = [];
+    mobileGraphReturnView = null;
     mobileGraphView.scale = 1;
     mobileGraphView.offsetX = 0;
     mobileGraphView.offsetY = 0;
     applyMobileGraphView(container, { animate });
+}
+
+function rememberMobileGraphView() {
+    // Keep the first viewport in an automatic focus session. Reopening the fan
+    // or selecting one of its points should still return to the original view.
+    if (mobileGraphReturnView) return;
+    mobileGraphReturnView = { ...mobileGraphView };
+}
+
+function restoreMobileGraphView(container, animate = true) {
+    if (!mobileGraphReturnView) return false;
+    const returnView = mobileGraphReturnView;
+    mobileGraphReturnView = null;
+    clearMobileFan();
+    mobileFocusedClusterIds = [];
+    mobileGraphView.scale = returnView.scale;
+    mobileGraphView.offsetX = returnView.offsetX;
+    mobileGraphView.offsetY = returnView.offsetY;
+    applyMobileGraphView(container, { animate });
+    return true;
 }
 
 function focusMobileGraphOnCluster(ids, container, minimumScale = 2.2) {
@@ -1901,6 +1923,7 @@ function clearMobileFan() {
 }
 
 function expandMobileFan(ids, container) {
+    rememberMobileGraphView();
     clearMobileFan();
     clearHighlight();
     focusMobileGraphOnCluster(ids, container);
@@ -1914,6 +1937,7 @@ function selectMobileItem(id) {
     clearMobileFan();
     const container = document.getElementById("graph-container");
     if (container && isMobileGraphExperience()) {
+        rememberMobileGraphView();
         // A lone point should get the same spatial focus as a cluster, just at a
         // gentler zoom so its surrounding context remains visible. Selecting a
         // point from an already-zoomed fan preserves the stronger cluster zoom.
@@ -2172,7 +2196,9 @@ function setupMobileGraphInteractions(container) {
                 [...renderedItems],
             );
             if (!nearestId) {
+                const hadHighlight = Boolean(_currentHighlightId);
                 clearHighlight();
+                if (!hadHighlight) restoreMobileGraphView(container, true);
                 return;
             }
             const cluster = mobileCollisionCluster(nearestId, container);

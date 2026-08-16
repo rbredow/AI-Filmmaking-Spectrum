@@ -79,6 +79,20 @@ function escapeHtml(value) {
     }[ch]));
 }
 
+// Express each coordinate using the side of the spectrum it actually leans
+// toward. A raw "G 28" reads like "28% Generative", while the same position is
+// more naturally understood as "72% Utility".
+function formatAxisPosition(value, lowLabel, highLabel) {
+    const rounded = Math.round(Math.max(0, Math.min(100, value)));
+    return rounded < 50
+        ? `${100 - rounded}% ${lowLabel}`
+        : `${rounded}% ${highLabel}`;
+}
+
+function formatSpectrumPosition(x, y) {
+    return `${formatAxisPosition(x, "Utility", "Generative")} · ${formatAxisPosition(y, "Not Ready", "Ready")}`;
+}
+
 let userDisplayName = "";
 let hasConfirmedName = false;
 const FADE_TIME = 5000; // 5 seconds
@@ -1347,7 +1361,7 @@ function createItemElements(container, item) {
     labelName.textContent = item.name;
     const labelValues = document.createElement("span");
     labelValues.className = "dot-label-values";
-    labelValues.textContent = `G ${Math.round(item.x)} · R ${Math.round(item.y)}`;
+    labelValues.textContent = formatSpectrumPosition(item.x, item.y);
     label.append(labelName, labelValues);
     updateLabelPosition(label, item.y);
     avgDot.appendChild(label);
@@ -1364,9 +1378,9 @@ function createItemElements(container, item) {
         </div>
         <div id="desc-${item.id}" style="font-size:var(--fs-xs); color:#aaa; line-height:1.2; margin-bottom:4px;">${escapeHtml(item.desc)}</div>
         <div style="font-size:var(--fs-xs); color:#888;">
-            <span style="color:#eee;">Generative: <b id="val-x-${item.id}">${Math.round(item.x)}</b>%</span>
+            <span id="val-x-${item.id}" style="color:#eee;">${formatAxisPosition(item.x, "Utility", "Generative")}</span>
             <span style="margin:0 4px; color:#444;">|</span>
-            <span style="color:#eee;">Readiness: <b id="val-y-${item.id}">${Math.round(item.y)}</b>%</span>
+            <span id="val-y-${item.id}" style="color:#eee;">${formatAxisPosition(item.y, "Not Ready", "Ready")}</span>
             <span id="my-vote-${item.id}" style="margin-left:6px; color:#3b82f6; display:none;"></span>
         </div>
     `;
@@ -2696,8 +2710,8 @@ function setupDrag(avgDot, userDot, item, container) {
                     title.innerText = `Vote for ${item.name}`;
                     stats.innerHTML = `
                         <div style="margin-top:10px;">
-                            <strong>Generative:</strong> ${Math.round(x)}%<br>
-                            <strong>Readiness:</strong> ${Math.round(y)}%
+                            <strong>${formatAxisPosition(x, "Utility", "Generative")}</strong><br>
+                            <strong>${formatAxisPosition(y, "Not Ready", "Ready")}</strong>
                         </div>
                     `;
 
@@ -2944,14 +2958,26 @@ function updateGraphFromData(allVotes, container) {
             if (label) updateLabelPosition(label, avgY);
             const labelValues = label?.querySelector(".dot-label-values");
             if (labelValues) {
-                labelValues.textContent = `G ${Math.round(avgX)} · R ${Math.round(avgY)}`;
+                labelValues.textContent = formatSpectrumPosition(avgX, avgY);
             }
 
             // UPDATE TOOLTIP VALUES
             const valX = document.getElementById(`val-x-${itemId}`);
             const valY = document.getElementById(`val-y-${itemId}`);
-            if (valX) valX.innerText = Math.round(avgX);
-            if (valY) valY.innerText = Math.round(avgY);
+            if (valX) {
+                valX.innerText = formatAxisPosition(
+                    avgX,
+                    "Utility",
+                    "Generative",
+                );
+            }
+            if (valY) {
+                valY.innerText = formatAxisPosition(
+                    avgY,
+                    "Not Ready",
+                    "Ready",
+                );
+            }
 
             // UPDATE PANEL ROW METRICS (bars + numbers)
             const barGen = document.getElementById(`bar-gen-${itemId}`);
@@ -2976,7 +3002,7 @@ function updateGraphFromData(allVotes, container) {
             if (myVoteDiv) {
                 if (myVote) {
                     myVoteDiv.style.display = "inline";
-                    myVoteDiv.innerHTML = `<span style="color:#444">|</span> Me: <b>${Math.round(myVote.x)}/${Math.round(myVote.y)}</b>`;
+                    myVoteDiv.innerHTML = `<span style="color:#444">|</span> Me: <b>${formatSpectrumPosition(myVote.x, myVote.y)}</b>`;
                 } else {
                     myVoteDiv.style.display = "none";
                 }

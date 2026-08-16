@@ -620,24 +620,6 @@ function updateAdminUI() {
 function initApp() {
     const container = document.getElementById("graph-container");
 
-    // Setup toggle button logic
-    const toggleBtn = document.getElementById("view-mode-btn");
-    if (toggleBtn) {
-        toggleBtn.onclick = () => {
-            clearMobileFan();
-            if (viewMode === "2D") {
-                viewMode = "1D";
-                toggleBtn.innerText = "1D";
-                container.classList.add("mode-1d");
-            } else {
-                viewMode = "2D";
-                toggleBtn.innerText = "2D";
-                container.classList.remove("mode-1d");
-            }
-            resetMobileGraphView(container, false);
-        };
-    }
-
     container.innerHTML = `
         <div class="y-axis-gradient"></div>
         <div class="x-axis-guide"></div>
@@ -647,15 +629,6 @@ function initApp() {
         <div class="axis-label x-label-right">Generative / Creative →</div>
         <div class="axis-label y-label-top">Ready</div>
         <div class="axis-label y-label-bottom">Not Ready</div>
-        <div id="top-right-controls">
-            <div id="add-item-btn" title="Add New Tool">+ New Tool</div>
-            <div id="view-mode-btn" title="Toggle 1D/2D View">2D</div>
-            <div id="timeline-btn" title="Open Voting History Timeline & Playback">Timeline</div>
-            <div id="branch-filter-container">
-                <div id="branch-filter-btn" title="Filter by Branch">Branch ▾</div>
-                <div id="branch-filter-dropdown" style="display: none;"></div>
-            </div>
-        </div>
         <!-- TIMELINE SCRUBBER OVERLAY -->
         <div id="timeline-bar" class="timeline-bar" style="display: none;">
             <div class="timeline-controls-left">
@@ -740,7 +713,7 @@ function initApp() {
     `;
     renderedItems.clear();
 
-    // Re-bind Toggle (since we wiped innerHTML)
+    // Bind the persistent view control in the app header.
     document.getElementById("view-mode-btn").onclick = () => {
         const btn = document.getElementById("view-mode-btn");
         clearMobileFan();

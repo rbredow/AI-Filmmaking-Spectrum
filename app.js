@@ -44,6 +44,7 @@ let votingEnabled = true;
 let addingEnabled = true;
 let isDragging = null;
 let isConfirmingVote = false; // Prevent interactions during confirmation
+let pendingVoteConfirmation = null;
 let previousData = {};
 let itemsCache = {}; // Local cache of items for weighted calculations
 let svgLayer = null;
@@ -111,6 +112,8 @@ const MOBILE_FAN_THRESHOLD = 32;
 const MOBILE_DRAG_THRESHOLD = 12;
 const MOBILE_MIN_ZOOM = 1;
 const MOBILE_MAX_ZOOM = 3.5;
+const MOBILE_PLOT_TOP_INSET = 60;
+const MOBILE_PLOT_BOTTOM_INSET = 32;
 let mobileFanItemIds = [];
 let mobileFocusedClusterIds = [];
 let mobileGraphTapStart = null;
@@ -360,19 +363,6 @@ function showToast(message) {
     setTimeout(() => toast.remove(), 3000);
 }
 
-function throttle(func, limit) {
-    let inThrottle;
-    return function () {
-        const args = arguments;
-        const context = this;
-        if (!inThrottle) {
-            func.apply(context, args);
-            inThrottle = true;
-            setTimeout(() => (inThrottle = false), limit);
-        }
-    };
-}
-
 // --- BOOTSTRAP ----------------------------------------------------------
 // On load we ask one cheap, read-only question of the LIVE database: "is
 // voting open?" (a single REST GET of /settings, ~tens of bytes, no websocket).
@@ -478,7 +468,10 @@ function startStatic(snapshot, enablePreview = false) {
     isAdmin = false;
     currentUser = enablePreview ? { uid: LOCAL_PREVIEW_UID } : null;
     votingEnabled = enablePreview || !!(snapshot.settings && snapshot.settings.votingEnabled);
-    addingEnabled = !!(snapshot.settings && snapshot.settings.addingEnabled);
+    // Static and preview sessions never have a production-backed identity.
+    // Keep every item-management surface disabled even if an older snapshot
+    // happened to capture addingEnabled=true.
+    addingEnabled = false;
     updateAdminUI();
     ensureDisplayName();
     initApp();
@@ -536,15 +529,6 @@ function setPreviewVote(itemId, vote) {
     updateGraphFromData(nextVotes, document.getElementById("graph-container"));
 }
 
-function removePreviewVote(itemId) {
-    const nextVotes = JSON.parse(JSON.stringify(previousData));
-    if (nextVotes[itemId]) {
-        delete nextVotes[itemId][LOCAL_PREVIEW_UID];
-        if (!Object.keys(nextVotes[itemId]).length) delete nextVotes[itemId];
-    }
-    updateGraphFromData(nextVotes, document.getElementById("graph-container"));
-}
-
 function saveVote(itemId, vote) {
     if (isLocalPreviewMode) {
         setPreviewVote(itemId, vote);
@@ -553,23 +537,14 @@ function saveVote(itemId, vote) {
     return set(ref(db, "votes/" + itemId + "/" + currentUser.uid), vote);
 }
 
-function updateVoteName(itemId, username) {
-    if (isLocalPreviewMode) {
-        const vote = previousData[itemId]?.[LOCAL_PREVIEW_UID];
-        if (vote) setPreviewVote(itemId, { ...vote, username });
-        return Promise.resolve();
-    }
-    return update(ref(db, "votes/" + itemId + "/" + currentUser.uid), {
-        username,
-    });
-}
-
-function deleteVote(itemId) {
-    if (isLocalPreviewMode) {
-        removePreviewVote(itemId);
-        return Promise.resolve();
-    }
-    return remove(ref(db, "votes/" + itemId + "/" + currentUser.uid));
+function allowProductionMutation() {
+    if (!isStaticMode) return true;
+    showToast(
+        isLocalPreviewMode
+            ? "Local preview — production changes are disabled"
+            : "Changes are unavailable in static mode",
+    );
+    return false;
 }
 
 function showUsernamePrompt() {
@@ -932,7 +907,7 @@ function initApp() {
     function applySettings(settings) {
         const s = settings || { votingEnabled: true, addingEnabled: true };
         votingEnabled = isLocalPreviewMode || s.votingEnabled;
-        addingEnabled = s.addingEnabled;
+        addingEnabled = isStaticMode ? false : !!s.addingEnabled;
 
         const toggleVoting = document.getElementById("toggle-voting");
         const toggleAdding = document.getElementById("toggle-adding");
@@ -1051,6 +1026,7 @@ function setupModalLogic() {
 
     if (addBtn)
         addBtn.onclick = () => {
+            if (!allowProductionMutation()) return;
             if (!addingEnabled && !isAdmin) {
                 showToast("Adding Closed");
                 return;
@@ -1075,6 +1051,10 @@ function setupModalLogic() {
     sliderY.oninput = () => (valY.innerText = sliderY.value);
 
     submitBtn.onclick = () => {
+        if (!allowProductionMutation()) {
+            modal.style.display = "none";
+            return;
+        }
         const name = document.getElementById("new-item-name").value.trim();
         const desc = document.getElementById("new-item-desc").value.trim();
         const x = parseInt(sliderX.value);
@@ -1119,6 +1099,10 @@ function setupEditModalLogic() {
     if (cancelBtn) cancelBtn.onclick = () => (modal.style.display = "none");
     if (submitBtn) {
         submitBtn.onclick = () => {
+            if (!allowProductionMutation()) {
+                modal.style.display = "none";
+                return;
+            }
             const id = document.getElementById("edit-item-id").value;
             const name = document.getElementById("edit-item-name").value.trim();
             const desc = document.getElementById("edit-item-desc").value.trim();
@@ -1155,6 +1139,10 @@ function setupResetModalLogic() {
     if (btnCancel) btnCancel.onclick = () => (modal.style.display = "none");
 
     btnBake.onclick = () => {
+        if (!allowProductionMutation()) {
+            modal.style.display = "none";
+            return;
+        }
         const id = document.getElementById("reset-item-id").value;
         const dot = document.getElementById(`dot-${id}`);
         if (id && dot) {
@@ -1171,6 +1159,10 @@ function setupResetModalLogic() {
     };
 
     btnClear.onclick = () => {
+        if (!allowProductionMutation()) {
+            modal.style.display = "none";
+            return;
+        }
         const id = document.getElementById("reset-item-id").value;
         if (id) {
             remove(ref(db, "votes/" + id));
@@ -1193,6 +1185,7 @@ function setupGlobalResetLogic() {
     const btnMigrate = document.getElementById("btn-migrate-tags");
     if (btnMigrate) {
         btnMigrate.onclick = () => {
+            if (!allowProductionMutation()) return;
             if (confirm("Apply default tags to all existing items? This won't delete any labels or votes, just adds missing branch tags.")) {
                 const updates = {};
                 Object.values(itemsCache).forEach(item => {
@@ -1215,17 +1208,26 @@ function setupGlobalResetLogic() {
 
     if (toggleVoting) {
         toggleVoting.onchange = () => {
+            if (!allowProductionMutation()) {
+                toggleVoting.checked = votingEnabled;
+                return;
+            }
             update(ref(db, "settings"), { votingEnabled: toggleVoting.checked });
         };
     }
     if (toggleAdding) {
         toggleAdding.onchange = () => {
+            if (!allowProductionMutation()) {
+                toggleAdding.checked = addingEnabled;
+                return;
+            }
             update(ref(db, "settings"), { addingEnabled: toggleAdding.checked });
         };
     }
 
     // 1. FACTORY RESET (Nuke)
     btnNuke.onclick = () => {
+        if (!allowProductionMutation()) return;
         if (
             confirm(
                 "FINAL WARNING: This will delete ALL user created tools and revert to the original 19 items.",
@@ -1245,6 +1247,7 @@ function setupGlobalResetLogic() {
 
     // 2. CLEAR VOTES (Keep Items)
     btnClearVotes.onclick = () => {
+        if (!allowProductionMutation()) return;
         if (
             confirm(
                 "Clear all votes? Items will snap back to their default positions.",
@@ -1257,6 +1260,7 @@ function setupGlobalResetLogic() {
 
     // 3. BAKE CONSENSUS
     btnBake.onclick = () => {
+        if (!allowProductionMutation()) return;
         if (
             confirm(
                 "Update all item defaults to their current positions and clear votes?",
@@ -1293,32 +1297,53 @@ function setupVoteConfirmModal() {
     const nameSection = document.getElementById("confirm-vote-username-section");
 
     cancelBtn.onclick = () => {
+        const pendingItemId = pendingVoteConfirmation?.itemId;
         isConfirmingVote = false;
+        pendingVoteConfirmation = null;
         modal.style.display = "none";
-        if (modal.dataset.itemId && currentUser) {
-            deleteVote(modal.dataset.itemId).catch((error) => {
-                console.error("Could not remove vote", error);
-            });
+        delete modal.dataset.itemId;
+
+        // Dragging is only a local preview. Re-rendering the last confirmed
+        // data removes a new vote's blue marker/connector, or restores an
+        // existing vote to its prior position, without touching Firebase.
+        if (pendingItemId) {
+            updateGraphFromData(
+                previousData,
+                document.getElementById("graph-container"),
+            );
         }
     };
 
     submitBtn.onclick = async () => {
         submitBtn.disabled = true;
+        cancelBtn.disabled = true;
         try {
-            // If name input is visible, validate and save it
+            const pending = pendingVoteConfirmation;
+            if (!pending || pending.itemId !== modal.dataset.itemId) {
+                throw new Error("No vote is awaiting confirmation.");
+            }
+
+            let confirmedName = userDisplayName;
+
+            // If name input is visible, validate it before saving anything.
             if (nameSection.style.display !== "none") {
                 const val = nameInput.value.trim();
                 if (!val) {
                     alert("Please enter a username.");
                     return;
                 }
+                confirmedName = val;
+            }
 
-                // Do not claim success until the server accepts the final name.
-                if (modal.dataset.itemId && currentUser) {
-                    await updateVoteName(modal.dataset.itemId, val);
-                }
+            // This is the first persistence call for the drag. Until the user
+            // presses Vote, the proposed position exists only in the DOM.
+            await saveVote(pending.itemId, {
+                ...pending.vote,
+                username: confirmedName,
+            });
 
-                userDisplayName = val;
+            if (nameSection.style.display !== "none") {
+                userDisplayName = confirmedName;
                 hasConfirmedName = true;
                 localStorage.setItem("voter_name", userDisplayName);
                 localStorage.setItem("voter_name_confirmed", "true");
@@ -1326,7 +1351,13 @@ function setupVoteConfirmModal() {
             }
 
             isConfirmingVote = false;
+            pendingVoteConfirmation = null;
             modal.style.display = "none";
+            delete modal.dataset.itemId;
+            updateGraphFromData(
+                previousData,
+                document.getElementById("graph-container"),
+            );
             showToast(
                 isLocalPreviewMode
                     ? "✓ Preview updated — not published"
@@ -1337,6 +1368,7 @@ function setupVoteConfirmModal() {
             showToast("Couldn’t confirm vote — try again");
         } finally {
             submitBtn.disabled = false;
+            cancelBtn.disabled = false;
         }
     };
 }
@@ -1503,13 +1535,32 @@ function clearHighlight() {
     }
 }
 
+function mobileGraphPlotBounds(container) {
+    const availableHeight = Math.max(1, container.clientHeight);
+    const top = Math.min(MOBILE_PLOT_TOP_INSET, availableHeight * 0.25);
+    const bottom = Math.min(MOBILE_PLOT_BOTTOM_INSET, availableHeight * 0.2);
+    return {
+        top,
+        bottom,
+        height: Math.max(1, availableHeight - top - bottom),
+    };
+}
+
 function baseGraphPoint(x, y, container) {
+    let graphY;
+    if (viewMode === "1D") {
+        graphY = container.clientHeight / 2;
+    } else if (isMobileGraphExperience()) {
+        const bounds = mobileGraphPlotBounds(container);
+        graphY =
+            bounds.top +
+            (1 - plotPct(y) / 100) * bounds.height;
+    } else {
+        graphY = (1 - plotPct(y) / 100) * container.clientHeight;
+    }
     return {
         x: (plotPct(x) / 100) * container.clientWidth,
-        y:
-            viewMode === "1D"
-                ? container.clientHeight / 2
-                : (1 - plotPct(y) / 100) * container.clientHeight,
+        y: graphY,
     };
 }
 
@@ -2382,8 +2433,12 @@ function renderToolPanel() {
         });
         row.addEventListener("click", () => {
             // Tap: keep highlight until another is chosen
-            clearMobileFan();
-            highlightItem(item.id);
+            if (isMobileGraphExperience()) {
+                selectMobileItem(item.id);
+            } else {
+                clearMobileFan();
+                highlightItem(item.id);
+            }
         });
 
         panelInner.appendChild(row);
@@ -2503,38 +2558,6 @@ function removeItemElements(id) {
 }
 
 function setupDrag(avgDot, userDot, item, container) {
-    const updateFirebase = throttle((x, y) => {
-        if (!currentUser || isConfirmingVote) return;
-
-        if (viewMode === "1D") {
-            let targetY = 50;
-            const itemVotes = previousData[item.id] || {};
-            if (itemVotes[currentUser.uid]) {
-                targetY = itemVotes[currentUser.uid].y;
-            } else {
-                const avgDotDom = document.getElementById(`dot-${item.id}`);
-                if (avgDotDom) {
-                    const currentBottom = avgDotDom.dataset.realY;
-                    if (currentBottom != null) targetY = parseFloat(currentBottom);
-                    else targetY = item.y;
-                }
-            }
-            saveVote(item.id, {
-                x: Math.round(x * 10) / 10,
-                y: Math.round(targetY * 10) / 10,
-                username: userDisplayName,
-                timestamp: Date.now(),
-            });
-        } else {
-            saveVote(item.id, {
-                x: Math.round(x * 10) / 10,
-                y: Math.round(y * 10) / 10,
-                username: userDisplayName,
-                timestamp: Date.now(),
-            });
-        }
-    }, 50);
-
     const startDrag = function (clientX, clientY, targetElement, originalEvent) {
         if (!currentUser || isConfirmingVote) return;
 
@@ -2616,12 +2639,22 @@ function setupDrag(avgDot, userDot, item, container) {
             if (newY < 0) newY = 0;
             if (newY > container.clientHeight) newY = container.clientHeight;
             let pointerX = (newX / container.clientWidth) * 100;
-            let pointerY = 100 - (newY / container.clientHeight) * 100;
+            let pointerY;
+            if (isMobileGraphExperience() && viewMode !== "1D") {
+                const bounds = mobileGraphPlotBounds(container);
+                const boundedY = Math.max(
+                    bounds.top,
+                    Math.min(bounds.top + bounds.height, newY),
+                );
+                pointerY =
+                    100 - ((boundedY - bounds.top) / bounds.height) * 100;
+            } else {
+                pointerY = 100 - (newY / container.clientHeight) * 100;
+            }
             let percentX = Math.max(0, Math.min(100, unplotPct(pointerX)));
             let percentY = Math.max(0, Math.min(100, unplotPct(pointerY)));
 
             updateElementPosition(activeDot, percentX, percentY);
-            updateFirebase(percentX, percentY);
 
             const avgDot = document.getElementById(`dot-${item.id}`);
             if (avgDot) {
@@ -2678,22 +2711,15 @@ function setupDrag(avgDot, userDot, item, container) {
                     }
 
                     isConfirmingVote = true;
-                    showToast(
-                        isLocalPreviewMode ? "Updating local preview…" : "Saving vote…",
-                    );
-                    try {
-                        await saveVote(item.id, {
+                    pendingVoteConfirmation = {
+                        itemId: item.id,
+                        vote: {
                             x: Math.round(x * 10) / 10,
                             y: Math.round(y * 10) / 10,
                             username: userDisplayName,
                             timestamp: Date.now(),
-                        });
-                    } catch (error) {
-                        console.error("Could not save vote", error);
-                        isConfirmingVote = false;
-                        showToast("Couldn’t confirm final position — try again");
-                        return;
-                    }
+                        },
+                    };
 
                     // --- SHOW CONFIRMATION MODAL ---
                     const modal = document.getElementById("confirm-vote-modal");
@@ -2919,24 +2945,31 @@ function updateGraphFromData(allVotes, container) {
             if (!activeVoters.has(uid)) dot.remove();
         });
 
-        let myVote = null;
-        if (currentUser && itemVotes[currentUser.uid]) {
-            myVote = itemVotes[currentUser.uid];
-            // If dragging, we use the local temp position for the average calculation
-            // to provide real-time feedback.
-            if (isDragging === itemId) {
-                const userDot = document.getElementById(`user-dot-${itemId}`);
-                if (userDot && userDot.dataset.tempX) {
-                    const tx = parseFloat(userDot.dataset.tempX);
-                    const ty = parseFloat(userDot.dataset.tempY);
-                    totalX += tx;
-                    totalY += ty;
-                    count++;
-                } else {
-                    totalX += myVote.x;
-                    totalY += myVote.y;
-                    count++;
-                }
+        const myVote = currentUser
+            ? itemVotes[currentUser.uid] || null
+            : null;
+        const userDot = document.getElementById(`user-dot-${itemId}`);
+        let dragPreviewVote = null;
+        if (
+            isDragging === itemId &&
+            userDot?.dataset.tempX != null &&
+            userDot?.dataset.tempY != null
+        ) {
+            dragPreviewVote = {
+                x: parseFloat(userDot.dataset.tempX),
+                y: parseFloat(userDot.dataset.tempY),
+                username: userDisplayName,
+            };
+        }
+
+        // A drag can preview the consensus locally, but it is not part of
+        // itemVotes (and therefore cannot persist) until Vote is pressed.
+        if (isDragging === itemId) {
+            const previewContribution = dragPreviewVote || myVote;
+            if (previewContribution) {
+                totalX += previewContribution.x;
+                totalY += previewContribution.y;
+                count++;
             }
         }
 
@@ -3008,9 +3041,13 @@ function updateGraphFromData(allVotes, container) {
                 }
             }
         }
-        const userDot = document.getElementById(`user-dot-${itemId}`);
+        const pendingVote =
+            pendingVoteConfirmation?.itemId === itemId
+                ? pendingVoteConfirmation.vote
+                : null;
+        const visibleUserVote = pendingVote || dragPreviewVote || myVote;
         if (userDot) {
-            if (myVote) {
+            if (visibleUserVote) {
                 userDot.style.display = "block";
                 // Ensure name is on user dot
                 let nameLabel = userDot.querySelector(".voter-username");
@@ -3019,7 +3056,7 @@ function updateGraphFromData(allVotes, container) {
                     nameLabel.className = "voter-username";
                     userDot.appendChild(nameLabel);
                 }
-                nameLabel.innerText = userDisplayName;
+                nameLabel.innerText = visibleUserVote.username || userDisplayName;
 
                 if (
                     isDragging === itemId ||
@@ -3047,8 +3084,18 @@ function updateGraphFromData(allVotes, container) {
                 }
 
                 if (isDragging !== itemId) {
-                    updateElementPosition(userDot, myVote.x, myVote.y);
-                    updateConnectionLine(itemId, avgX, avgY, myVote.x, myVote.y);
+                    updateElementPosition(
+                        userDot,
+                        visibleUserVote.x,
+                        visibleUserVote.y,
+                    );
+                    updateConnectionLine(
+                        itemId,
+                        avgX,
+                        avgY,
+                        visibleUserVote.x,
+                        visibleUserVote.y,
+                    );
                 } else {
                     const currentDomLeft = parseFloat(userDot.dataset.realX);
                     const currentDomBottom = parseFloat(userDot.dataset.realY);
@@ -3340,6 +3387,7 @@ function obbOverlapAmount(a, b) {
 }
 
 window.deleteItem = (id) => {
+    if (!allowProductionMutation()) return;
     if (confirm("Are you sure you want to delete this item?")) {
         remove(ref(db, "items/" + id));
         remove(ref(db, "votes/" + id));
@@ -3347,12 +3395,14 @@ window.deleteItem = (id) => {
 };
 
 window.resetVotes = (id) => {
+    if (!allowProductionMutation()) return;
     const modal = document.getElementById("reset-options-modal");
     document.getElementById("reset-item-id").value = id;
     modal.style.display = "flex";
 };
 
 window.editItem = (id) => {
+    if (!allowProductionMutation()) return;
     const modal = document.getElementById("edit-item-modal");
     const name = document.querySelector(`#label-${id} .dot-label-name`)?.innerText || "";
     const desc = document.getElementById(`desc-${id}`).innerText;

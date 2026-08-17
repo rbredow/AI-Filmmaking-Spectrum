@@ -1848,6 +1848,7 @@ button:active {
     #app-title-group {
         flex: 1 1 auto;
         min-width: 0;
+        overflow: hidden;
     }
 
     #header h2 {
@@ -1855,6 +1856,8 @@ button:active {
         font-size: var(--fs-lg);
         letter-spacing: 0.2px;
         white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     #header p {
@@ -1957,6 +1960,12 @@ button:active {
     #app-title-group {
         flex: 1 1 auto;
         min-width: 0;
+        overflow: hidden;
+    }
+
+    #app-title-group h2 {
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     #header p {
@@ -2184,6 +2193,32 @@ button:active {
     #branch-filter-btn,
     #view-mode-btn,
     #timeline-btn {
+        font-size: var(--fs-xs);
+    }
+
+    #timeline-btn {
+        width: 32px;
+        min-width: 32px;
+        padding: 0;
+        font-size: 0;
+    }
+
+    #timeline-btn::before {
+        content: "◷";
+        font-size: 18px;
+        font-weight: 400;
+        line-height: 1;
+    }
+
+    #branch-filter-btn {
+        width: 42px;
+        min-width: 42px;
+        padding: 0;
+        font-size: 0;
+    }
+
+    #branch-filter-btn::before {
+        content: "Filter";
         font-size: var(--fs-xs);
     }
 
@@ -2610,6 +2645,16 @@ button:active {
         overscroll-behavior: contain;
         -webkit-user-select: none;
         user-select: none;
+    }
+
+    #graph-container.timeline-open .x-label-left,
+    #graph-container.timeline-open .x-label-right,
+    #graph-container.timeline-open .y-label-bottom {
+        bottom: 76px;
+    }
+
+    #graph-container.timeline-open .y-axis-gradient {
+        bottom: 74px;
     }
 
     .panel-row-name,

@@ -114,6 +114,7 @@ const MOBILE_MIN_ZOOM = 1;
 const MOBILE_MAX_ZOOM = 3.5;
 const MOBILE_PLOT_TOP_INSET = 60;
 const MOBILE_PLOT_BOTTOM_INSET = 32;
+const MOBILE_TIMELINE_PLOT_BOTTOM_INSET = 78;
 let mobileFanItemIds = [];
 let mobileFocusedClusterIds = [];
 let mobileGraphTapStart = null;
@@ -1538,7 +1539,10 @@ function clearHighlight() {
 function mobileGraphPlotBounds(container) {
     const availableHeight = Math.max(1, container.clientHeight);
     const top = Math.min(MOBILE_PLOT_TOP_INSET, availableHeight * 0.25);
-    const bottom = Math.min(MOBILE_PLOT_BOTTOM_INSET, availableHeight * 0.2);
+    const requestedBottom = isTimelineOpen
+        ? MOBILE_TIMELINE_PLOT_BOTTOM_INSET
+        : MOBILE_PLOT_BOTTOM_INSET;
+    const bottom = Math.min(requestedBottom, availableHeight * 0.35);
     return {
         top,
         bottom,
@@ -3822,6 +3826,7 @@ async function openTimeline() {
     const container = document.getElementById("graph-container");
     if (btn) btn.classList.add("active");
     if (bar) bar.style.display = "flex";
+    if (container) container.classList.add("timeline-open");
 
     closeAllTooltips();
 
@@ -3848,7 +3853,7 @@ function closeTimeline() {
     const container = document.getElementById("graph-container");
     if (btn) btn.classList.remove("active");
     if (bar) bar.style.display = "none";
-    if (container) container.classList.remove("mode-timeline");
+    if (container) container.classList.remove("mode-timeline", "timeline-open");
 
     jumpToLive();
 }

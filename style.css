@@ -513,6 +513,367 @@ p {
     background: #333;
 }
 
+/* Timeline Toggle Button */
+#timeline-btn {
+    position: relative;
+    color: #888;
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    cursor: pointer;
+    height: 28px;
+    line-height: 26px;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: color 0.2s, border-color 0.2s, background 0.2s, box-shadow 0.2s;
+    border: 1px solid #333;
+    padding: 0 10px;
+    border-radius: 4px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#timeline-btn:hover {
+    color: #fff;
+    border-color: #666;
+}
+
+#timeline-btn:active {
+    background: #333;
+}
+
+#timeline-btn.active {
+    color: #60a5fa;
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.18);
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.45);
+}
+
+/* --- TIMELINE SCRUBBER BAR --- */
+.timeline-bar {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    max-width: 860px;
+    margin: 0 auto;
+    background: rgba(15, 17, 23, 0.92);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.75), 0 0 1px rgba(255, 255, 255, 0.2);
+    z-index: 1050;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 14px;
+    box-sizing: border-box;
+    animation: timelineSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes timelineSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.timeline-controls-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.timeline-ctrl-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s, transform 0.1s;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.timeline-ctrl-btn:hover {
+    background: #1d4ed8;
+    transform: scale(1.05);
+}
+
+.timeline-ctrl-btn:active {
+    transform: scale(0.95);
+}
+
+.timeline-date-display {
+    display: flex;
+    flex-direction: column;
+    min-width: 95px;
+}
+
+#timeline-date-label {
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+}
+
+.timeline-sub-label {
+    font-size: var(--fs-xs);
+    color: #94a3b8;
+    line-height: 1;
+    margin-top: 2px;
+}
+
+/* Slider Track & Wrapper */
+.timeline-slider-wrapper {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    min-width: 120px;
+}
+
+.timeline-track-bg {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 3px;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.timeline-progress {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #60a5fa);
+    border-radius: 3px;
+    width: 100%;
+    pointer-events: none;
+    transition: width 0.05s linear;
+}
+
+.timeline-markers {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.timeline-marker {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    pointer-events: auto;
+    z-index: 5;
+}
+
+.timeline-marker-tick {
+    position: absolute;
+    width: 2px;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.45);
+    border-radius: 1px;
+    pointer-events: none;
+}
+
+.timeline-marker-dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: #60a5fa;
+    border: 1.5px solid #0f172a;
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(96, 165, 250, 0.85);
+    transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+    pointer-events: none;
+}
+
+.timeline-marker:hover .timeline-marker-dot,
+.timeline-marker.hover .timeline-marker-dot {
+    transform: scale(1.5);
+    background: #ffffff;
+    box-shadow: 0 0 10px #60a5fa, 0 0 4px #ffffff;
+}
+
+.timeline-marker-tooltip {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #f1f5f9;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 5px;
+    padding: 5px 9px;
+    font-size: var(--fs-xs);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
+    z-index: 25;
+}
+
+.timeline-marker:hover .timeline-marker-tooltip,
+.timeline-marker.hover .timeline-marker-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-2px);
+}
+
+#timeline-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 28px;
+    background: transparent;
+    cursor: pointer;
+    margin: 0;
+    position: relative;
+    z-index: 10;
+    outline: none;
+}
+
+#timeline-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px solid #3b82f6;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.9), 0 2px 4px rgba(0, 0, 0, 0.5);
+    cursor: grab;
+    transition: transform 0.1s ease;
+}
+
+#timeline-slider:active::-webkit-slider-thumb {
+    cursor: grabbing;
+    transform: scale(1.25);
+    box-shadow: 0 0 14px rgba(59, 130, 246, 1);
+}
+
+#timeline-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px solid #3b82f6;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.9), 0 2px 4px rgba(0, 0, 0, 0.5);
+    cursor: grab;
+    transition: transform 0.1s ease;
+}
+
+#timeline-slider:active::-moz-range-thumb {
+    cursor: grabbing;
+    transform: scale(1.25);
+}
+
+/* Timeline Controls Right */
+.timeline-controls-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.timeline-live-pill {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #94a3b8;
+    font-size: var(--fs-xs);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 4px 10px;
+    border-radius: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.2s ease;
+}
+
+.timeline-live-pill:hover {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.timeline-live-pill.active {
+    border-color: #00e676;
+    color: #00e676;
+    background: rgba(0, 230, 118, 0.12);
+}
+
+.live-pulse-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #94a3b8;
+    transition: background-color 0.2s;
+}
+
+.timeline-live-pill.active .live-pulse-dot {
+    background-color: #00e676;
+    box-shadow: 0 0 6px #00e676;
+    animation: livePulse 1.8s infinite;
+}
+
+@keyframes livePulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(1.2); }
+}
+
+.timeline-close-btn {
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: color 0.15s, background-color 0.15s;
+    padding: 0;
+}
+
+.timeline-close-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.mode-timeline .user-dot,
+.mode-timeline .connection-line {
+    display: none !important;
+}
+
 #view-mode-btn.hint-glow {
     box-shadow: 0 0 15px #3b82f6, 0 0 5px #3b82f6;
     border-color: #3b82f6;
@@ -694,6 +1055,44 @@ p {
     opacity: 0.6;
     vector-effect: non-scaling-stroke;
     transition: opacity 0.5s;
+}
+
+/* Compare Mode Before/After Lines & Ghost Dots */
+.compare-line {
+    stroke: #3b82f6;
+    stroke-width: 1.5px;
+    stroke-dasharray: 2.5 2.5;
+    opacity: 0;
+    vector-effect: non-scaling-stroke;
+    transition: opacity 0.4s ease-out;
+}
+
+.compare-line.visible {
+    opacity: 0.85;
+}
+
+.compare-ghost-dot {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: #3b82f6;
+    border: 2px solid #ffffff;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);
+    transform: translate(-50%, 50%);
+    pointer-events: none;
+    z-index: 9;
+    opacity: 0;
+    transition: opacity 0.4s ease-out;
+}
+
+.compare-ghost-dot.visible {
+    opacity: 1;
+}
+
+.mode-compare .user-dot,
+.mode-compare .connection-line:not(.compare-line) {
+    display: none !important;
 }
 
 /* --- SPLASH ANIMATION --- */
@@ -1550,19 +1949,54 @@ button:active {
 
     /* Controls use the smallest type token on mobile */
     #branch-filter-btn,
-    #view-mode-btn {
+    #view-mode-btn,
+    #timeline-btn {
         font-size: var(--fs-xs);
     }
 
     #search-container,
     #branch-filter-container,
     #view-mode-btn,
+    #timeline-btn,
     #add-item-btn {
         position: relative;
         top: auto;
         right: auto;
         left: auto;
         bottom: auto;
+    }
+
+    /* Mobile Timeline Bar */
+    .timeline-bar {
+        bottom: 8px;
+        left: 8px;
+        right: 8px;
+        padding: 6px 10px;
+        gap: 8px;
+    }
+
+    .timeline-ctrl-btn {
+        width: 28px;
+        height: 28px;
+    }
+
+    .timeline-date-display {
+        min-width: 68px;
+    }
+
+    #timeline-date-label {
+        font-size: var(--fs-xs);
+    }
+
+    .timeline-live-pill {
+        padding: 3px 7px;
+        font-size: 10px;
+    }
+
+    .timeline-close-btn {
+        width: 24px;
+        height: 24px;
+        font-size: 14px;
     }
 
     #search-container {
@@ -1803,6 +2237,7 @@ button:active {
     /* Controls even more compact */
     #add-item-btn,
     #view-mode-btn,
+    #timeline-btn,
     #search-container {
         top: 5px;
     }
@@ -1964,6 +2399,8 @@ button:active {
     .tooltip,
     #add-item-btn,
     #view-mode-btn,
+    #timeline-btn,
+    .timeline-bar,
     #search-container,
     #global-reset-btn,
     .modal-overlay {

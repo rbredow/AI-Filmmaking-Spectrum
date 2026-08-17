@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-08-14T02:36:41.325Z",
+  "capturedAt": "2026-08-17T18:37:52.986Z",
   "source": "ai-filmmaking-spectrum-default-rtdb.firebaseio.com",
   "settings": {
     "addingEnabled": false,
@@ -148,15 +148,15 @@
       "y": 70.2
     },
     "d14": {
-      "desc": "Midjourney. High readiness for concepts, but Low utility for final pixel.",
+      "desc": "Artists using AI to generate storyboards for reels and prep",
       "id": "d14",
       "name": "AI Storyboard",
       "tags": [
+        "Cinematographers",
         "Directors",
         "Producers",
         "Production Design",
-        "Writers",
-        "Cinematographers"
+        "Writers"
       ],
       "x": 72.4116,
       "y": 81.1957
@@ -387,6 +387,21 @@
       ],
       "x": 50,
       "y": 50
+    },
+    "user_item_1786819603744": {
+      "createdBy": "Ets5KBHIjHaXhL2GNZFAqP2AKuw2",
+      "desc": "",
+      "id": "user_item_1786819603744",
+      "name": "Iterative image/video editing",
+      "tags": [
+        "Animation",
+        "Cinematographers",
+        "Directors",
+        "Short Films",
+        "Visual Effects"
+      ],
+      "x": 79,
+      "y": 25
     }
   },
   "votes": {
@@ -428,6 +443,11 @@
         "x": 12.7,
         "y": 89.4
       },
+      "aVIlxKHdpkMryXKulDFxj1sUO5k2": {
+        "username": "Teal-Penguin-648",
+        "x": 15.1,
+        "y": 71.2
+      },
       "gAOpJXK3TTPYlISiKTwi02MuOl52": {
         "username": "Amber-Owl-790",
         "x": 10.9,
@@ -454,6 +474,11 @@
         "username": "Cyan-Panda-493",
         "x": 13,
         "y": 89.6
+      },
+      "FDW1YoemfdZQCkDF86ohSWuv8Dc2": {
+        "username": "Teal-Fox-400",
+        "x": 93,
+        "y": 90.4
       },
       "gAOpJXK3TTPYlISiKTwi02MuOl52": {
         "username": "Amber-Owl-790",
@@ -511,6 +536,16 @@
       }
     },
     "d06": {
+      "A8LDzTcaDMNEhY0BYw4ky1GMrl23": {
+        "username": "Indigo-Whale-438",
+        "x": 27.8,
+        "y": 88.5
+      },
+      "aVIlxKHdpkMryXKulDFxj1sUO5k2": {
+        "username": "Teal-Penguin-648",
+        "x": 20.1,
+        "y": 96
+      },
       "gAOpJXK3TTPYlISiKTwi02MuOl52": {
         "username": "Amber-Owl-790",
         "x": 32.6,
@@ -525,6 +560,11 @@
       }
     },
     "d08": {
+      "aVIlxKHdpkMryXKulDFxj1sUO5k2": {
+        "username": "Teal-Penguin-648",
+        "x": 66.6,
+        "y": 76.5
+      },
       "gAOpJXK3TTPYlISiKTwi02MuOl52": {
         "username": "Amber-Owl-790",
         "x": 55.3,
@@ -537,6 +577,16 @@
       }
     },
     "d09": {
+      "9kBMpQZy3kNMJnweCfeWvg9RpIK2": {
+        "username": "Teal-Penguin-888",
+        "x": 22.3,
+        "y": 43.4
+      },
+      "aVIlxKHdpkMryXKulDFxj1sUO5k2": {
+        "username": "Teal-Penguin-648",
+        "x": 26.5,
+        "y": 58.5
+      },
       "gAOpJXK3TTPYlISiKTwi02MuOl52": {
         "username": "Amber-Owl-790",
         "x": 46.3,
@@ -598,6 +648,16 @@
         "x": 58,
         "y": 90.5
       },
+      "9kBMpQZy3kNMJnweCfeWvg9RpIK2": {
+        "username": "Teal-Penguin-888",
+        "x": 38.6,
+        "y": 82.1
+      },
+      "aVIlxKHdpkMryXKulDFxj1sUO5k2": {
+        "username": "Teal-Penguin-648",
+        "x": 49.4,
+        "y": 98.5
+      },
       "gAOpJXK3TTPYlISiKTwi02MuOl52": {
         "username": "Amber-Owl-790",
         "x": 57.2,
@@ -619,6 +679,11 @@
         "username": "Blue-Shark-203",
         "x": 68,
         "y": 71.8
+      },
+      "aVIlxKHdpkMryXKulDFxj1sUO5k2": {
+        "username": "Teal-Penguin-648",
+        "x": 53.3,
+        "y": 98.2
       },
       "gAOpJXK3TTPYlISiKTwi02MuOl52": {
         "username": "Amber-Owl-790",
@@ -652,6 +717,16 @@
         "x": 73.1,
         "y": 49.9
       },
+      "9kBMpQZy3kNMJnweCfeWvg9RpIK2": {
+        "username": "Teal-Penguin-888",
+        "x": 38.6,
+        "y": 92.4
+      },
+      "aVIlxKHdpkMryXKulDFxj1sUO5k2": {
+        "username": "Teal-Penguin-648",
+        "x": 71.9,
+        "y": 42.6
+      },
       "gAOpJXK3TTPYlISiKTwi02MuOl52": {
         "username": "Amber-Owl-790",
         "x": 71.7,
@@ -674,10 +749,25 @@
       }
     },
     "d15": {
+      "UHSZfKPnvVXgxmAjmnxL3aRX4kq1": {
+        "username": "Lime-Owl-673",
+        "x": 75.3,
+        "y": 90.9
+      },
+      "aVIlxKHdpkMryXKulDFxj1sUO5k2": {
+        "username": "Teal-Penguin-648",
+        "x": 73.8,
+        "y": 54.7
+      },
       "gAOpJXK3TTPYlISiKTwi02MuOl52": {
         "username": "Amber-Owl-790",
         "x": 74.1,
         "y": 72
+      },
+      "nI7lJZI1sPMxkRzUINkH9rEmoKl2": {
+        "username": "Jeff Shapiro",
+        "x": 72.6,
+        "y": 78.8
       },
       "wuELvwgy1nTSewKE3ldKDxJOaCC3": {
         "username": "Chaitanya C",
@@ -691,10 +781,42 @@
         "x": 81.5,
         "y": 69.8
       },
+      "V23GXHgKaXcJyTkcTAkWmm7KWDI2": {
+        "username": "Blue-Zebra-460",
+        "x": 59,
+        "y": 47.2
+      },
+      "aVIlxKHdpkMryXKulDFxj1sUO5k2": {
+        "username": "Teal-Penguin-648",
+        "x": 82.3,
+        "y": 49
+      },
       "wuELvwgy1nTSewKE3ldKDxJOaCC3": {
         "username": "Chaitanya C",
         "x": 87,
         "y": 84.6
+      }
+    },
+    "d17": {
+      "9kBMpQZy3kNMJnweCfeWvg9RpIK2": {
+        "username": "Teal-Penguin-888",
+        "x": 80.8,
+        "y": 20.5
+      },
+      "Gn3MwFocsJgTE7FJDS06BOyFsJq1": {
+        "username": "Orange-Eagle-501",
+        "x": 42.6,
+        "y": 27.1
+      },
+      "YKL5jdKqDba525cosjG5ao5w0Wl2": {
+        "username": "Rob",
+        "x": 64,
+        "y": 53.3
+      },
+      "aVIlxKHdpkMryXKulDFxj1sUO5k2": {
+        "username": "Teal-Penguin-648",
+        "x": 81,
+        "y": 15.9
       }
     },
     "d18": {
@@ -708,10 +830,30 @@
         "x": 89.5,
         "y": 52.8
       },
+      "9kBMpQZy3kNMJnweCfeWvg9RpIK2": {
+        "username": "Teal-Penguin-888",
+        "x": 49.2,
+        "y": 64.5
+      },
+      "Gn3MwFocsJgTE7FJDS06BOyFsJq1": {
+        "username": "Orange-Eagle-501",
+        "x": 98.9,
+        "y": 25.4
+      },
       "L8HYrfj2qyMReIPWI4nJz6CgDYJ3": {
         "username": "Ujwal Nirgudkar",
         "x": 86.9,
         "y": 59.1
+      },
+      "Q8eM1b82AAecZyNDjLg87Jpu61W2": {
+        "username": "Yellow-Panda-825",
+        "x": 84.9,
+        "y": 65.5
+      },
+      "aVIlxKHdpkMryXKulDFxj1sUO5k2": {
+        "username": "Teal-Penguin-648",
+        "x": 97.9,
+        "y": 49.5
       },
       "kwhj81G4pfWPTDHge13wOIwA5hb2": {
         "username": "Nick C",
@@ -724,6 +866,31 @@
         "username": "Red-Elephant-306",
         "x": 98.7,
         "y": 32.6
+      },
+      "9kBMpQZy3kNMJnweCfeWvg9RpIK2": {
+        "username": "Teal-Penguin-888",
+        "x": 96.6,
+        "y": 34.1
+      },
+      "CpWtNCgQlMM1vPX7MLJkY2SZ05q2": {
+        "username": "Deep-Purple-Penguin-462",
+        "x": 99.3,
+        "y": 1.4
+      },
+      "UHSZfKPnvVXgxmAjmnxL3aRX4kq1": {
+        "username": "Lime-Owl-673",
+        "x": 92.8,
+        "y": 0
+      },
+      "YKL5jdKqDba525cosjG5ao5w0Wl2": {
+        "username": "Rob",
+        "x": 99.1,
+        "y": 0
+      },
+      "aVIlxKHdpkMryXKulDFxj1sUO5k2": {
+        "username": "Teal-Penguin-648",
+        "x": 100,
+        "y": 0
       },
       "zOxtZK2qvfbIYyfayL1DSEPQ69I3": {
         "username": "Orange-Elephant-853",
@@ -744,6 +911,16 @@
       }
     },
     "user_item_1768948088119": {
+      "L8O2YOMmamRZB75IUK1UY2SlaeH2": {
+        "username": "Otherthings",
+        "x": 58.7,
+        "y": 37.8
+      },
+      "aVIlxKHdpkMryXKulDFxj1sUO5k2": {
+        "username": "Teal-Penguin-648",
+        "x": 60.7,
+        "y": 18.4
+      },
       "vpodBq4BKrUYEPh0EUNmxjnoiW73": {
         "username": "Light-Blue-Lion-246",
         "x": 64.3,
@@ -770,8 +947,13 @@
       },
       "YKL5jdKqDba525cosjG5ao5w0Wl2": {
         "username": "Rob",
-        "x": 48.7,
-        "y": 84.6
+        "x": 47.5,
+        "y": 91.3
+      },
+      "aVIlxKHdpkMryXKulDFxj1sUO5k2": {
+        "username": "Teal-Penguin-648",
+        "x": 42.1,
+        "y": 94.2
       },
       "gAOpJXK3TTPYlISiKTwi02MuOl52": {
         "username": "Amber-Owl-790",
@@ -782,6 +964,11 @@
         "username": "JC Bond",
         "x": 52,
         "y": 79.8
+      },
+      "nI7lJZI1sPMxkRzUINkH9rEmoKl2": {
+        "username": "Jeff Shapiro",
+        "x": 42.6,
+        "y": 88
       },
       "sQmcrde3fla7B0kj1CedL9EtJzv2": {
         "username": "Rod Maxwell",
@@ -846,6 +1033,11 @@
         "x": 93.6,
         "y": 69.7
       },
+      "nI7lJZI1sPMxkRzUINkH9rEmoKl2": {
+        "username": "Jeff Shapiro",
+        "x": 86.9,
+        "y": 92.7
+      },
       "vpodBq4BKrUYEPh0EUNmxjnoiW73": {
         "username": "Light-Blue-Lion-246",
         "x": 89,
@@ -867,6 +1059,21 @@
         "username": "Ujwal Nirgudkar",
         "x": 24.5,
         "y": 74.2
+      },
+      "UHSZfKPnvVXgxmAjmnxL3aRX4kq1": {
+        "username": "Lime-Owl-673",
+        "x": 27.7,
+        "y": 100
+      },
+      "V23GXHgKaXcJyTkcTAkWmm7KWDI2": {
+        "username": "Blue-Zebra-460",
+        "x": 23.7,
+        "y": 91.6
+      },
+      "tBIMHJ8OJNSb6Y7cGJWcn8Gm1n02": {
+        "username": "Yellow-Koala-167",
+        "x": 13.1,
+        "y": 74.2
       }
     },
     "user_item_1769881339160": {
@@ -877,10 +1084,20 @@
       }
     },
     "user_item_1769881360761": {
+      "9kBMpQZy3kNMJnweCfeWvg9RpIK2": {
+        "username": "Teal-Penguin-888",
+        "x": 44,
+        "y": 40
+      },
       "9uAhHIP2QXd9nkFIRQt75C35g5r2": {
         "username": "Hanno",
         "x": 79,
         "y": 54
+      },
+      "aVIlxKHdpkMryXKulDFxj1sUO5k2": {
+        "username": "Teal-Penguin-648",
+        "x": 38,
+        "y": 43.2
       },
       "vpodBq4BKrUYEPh0EUNmxjnoiW73": {
         "username": "Light-Blue-Lion-246",
@@ -889,6 +1106,11 @@
       }
     },
     "user_item_1774726643295": {
+      "aVIlxKHdpkMryXKulDFxj1sUO5k2": {
+        "username": "Teal-Penguin-648",
+        "x": 82.9,
+        "y": 12.7
+      },
       "vpodBq4BKrUYEPh0EUNmxjnoiW73": {
         "username": "Light-Blue-Lion-246",
         "x": 71,
@@ -896,13 +1118,55 @@
       }
     },
     "user_item_1774996431355": {
-      "YKL5jdKqDba525cosjG5ao5w0Wl2": {
-        "username": "Rob",
-        "x": 96,
-        "y": 5
+      "23V5N8gsj7PZOV2yJYwooyJAYJB2": {
+        "username": "Cyan-Koala-411",
+        "x": 99.8,
+        "y": 0
+      },
+      "NNO3qKtbaweOMkDJD2KZEdQuXA83": {
+        "username": "Orange-Shark-811",
+        "x": 62.6,
+        "y": 51.5
+      },
+      "YhWqkmFxvOTSFvcxUnDYVadonXH2": {
+        "username": "Red-Shark-584",
+        "x": 100,
+        "y": 0
+      },
+      "jNLhOp7f2aW3Acaw77zs3a2LVd42": {
+        "username": "Cyan-Bear-816",
+        "x": 89.6,
+        "y": 12.6
+      },
+      "oKEhB9endsXCie1RpMvbb3J1eF53": {
+        "username": "Indigo-Tiger-620",
+        "x": 91.5,
+        "y": 8
+      }
+    },
+    "user_item_1780766470184": {
+      "NNO3qKtbaweOMkDJD2KZEdQuXA83": {
+        "username": "Orange-Shark-811",
+        "x": 60.5,
+        "y": 81.6
+      },
+      "aVIlxKHdpkMryXKulDFxj1sUO5k2": {
+        "username": "Teal-Penguin-648",
+        "x": 59,
+        "y": 100
       }
     },
     "user_item_1780767215655": {
+      "A8LDzTcaDMNEhY0BYw4ky1GMrl23": {
+        "username": "Indigo-Whale-438",
+        "x": 88.9,
+        "y": 68.6
+      },
+      "CpWtNCgQlMM1vPX7MLJkY2SZ05q2": {
+        "username": "Deep-Purple-Penguin-462",
+        "x": 87.3,
+        "y": 95.9
+      },
       "UB6TZ5YEnMPMtzM1wwdpBU9qMzG2": {
         "username": "Orange-Shark-382",
         "x": 87.5,
@@ -910,10 +1174,81 @@
       }
     },
     "user_item_1780767521906": {
+      "2oNedzEdIPWaPxmzRaNBP7ZGyjs1": {
+        "username": "ZBarz",
+        "x": 68.7,
+        "y": 47.9
+      },
+      "9fN5vUdkadel5QYIdIabEx4W9DV2": {
+        "username": "Red-Koala-179",
+        "x": 51.1,
+        "y": 49.9
+      },
+      "A8LDzTcaDMNEhY0BYw4ky1GMrl23": {
+        "username": "Indigo-Whale-438",
+        "x": 47.2,
+        "y": 60
+      },
+      "CpWtNCgQlMM1vPX7MLJkY2SZ05q2": {
+        "username": "Deep-Purple-Penguin-462",
+        "x": 48.8,
+        "y": 63.6
+      },
       "L8HYrfj2qyMReIPWI4nJz6CgDYJ3": {
         "username": "Ujwal Nirgudkar",
         "x": 46.7,
         "y": 62.8
+      },
+      "Uvnjqy57etXrap2weew375ck5af1": {
+        "username": "Green-Bear-939",
+        "x": 38,
+        "y": 66.5
+      },
+      "V23GXHgKaXcJyTkcTAkWmm7KWDI2": {
+        "username": "Blue-Zebra-460",
+        "x": 42.5,
+        "y": 67
+      },
+      "aVIlxKHdpkMryXKulDFxj1sUO5k2": {
+        "username": "Teal-Penguin-648",
+        "x": 48,
+        "y": 71.2
+      }
+    },
+    "user_item_1786819311785": {
+      "9kBMpQZy3kNMJnweCfeWvg9RpIK2": {
+        "username": "Teal-Penguin-888",
+        "x": 61,
+        "y": 24.1
+      },
+      "Ets5KBHIjHaXhL2GNZFAqP2AKuw2": {
+        "username": "Blue-Giraffe-456",
+        "x": 79,
+        "y": 25
+      },
+      "R1hdWdaFAKgzVn6xtTYnlDPFRLO2": {
+        "username": "Teal-Lion-561",
+        "x": 77.9,
+        "y": 26.7
+      }
+    },
+    "user_item_1786819446765": {
+      "9kBMpQZy3kNMJnweCfeWvg9RpIK2": {
+        "username": "Teal-Penguin-888",
+        "x": 34,
+        "y": 80
+      },
+      "NNO3qKtbaweOMkDJD2KZEdQuXA83": {
+        "username": "Orange-Shark-811",
+        "x": 29.4,
+        "y": 95.9
+      }
+    },
+    "user_item_1786819603744": {
+      "Ets5KBHIjHaXhL2GNZFAqP2AKuw2": {
+        "username": "Blue-Giraffe-456",
+        "x": 79,
+        "y": 25
       }
     }
   }

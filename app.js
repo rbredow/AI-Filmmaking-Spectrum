@@ -52,6 +52,17 @@ let viewMode = "2D"; // Default to 2D View
 let isOnboardingActive = false;
 let onboardingStep = 0;
 let hasLoadedInitialVotes = false;
+let baselineSnapshot = null;
+let latestLiveVotes = null;
+let isTimelineOpen = false;
+let isTimelinePlaying = false;
+let timelineAnimationId = null;
+let timelineMinTime = 0;
+let timelineMaxTime = 0;
+let currentTimelineTimestamp = 0;
+let visibleItemIdsAtCurrentTime = new Set();
+let lastScrubDirection = 1;
+let lastScrubTimestamp = 0;
 const ADMIN_EMAIL = "rob.bredow@gmail.com";
 
 // Escape user-supplied text before interpolating into innerHTML.
@@ -370,6 +381,7 @@ async function boot() {
             .then((r) => (r.ok ? r.json() : null))
             .catch((e) => { console.warn("Live voting-state check failed.", e); return null; }),
     ]);
+    baselineSnapshot = snapshot;
 
     // Prefer the live voting flag. If it couldn't be read, fall back to the
     // snapshot's own flag so a hiccup never strands us in the wrong mode.
@@ -411,6 +423,7 @@ function startStatic(snapshot) {
     // vote/write path. isAdmin is false too — admins use ?live=1 to manage.
     isStaticMode = true;
     staticSnapshot = snapshot;
+    baselineSnapshot = snapshot;
     isAdmin = false;
     votingEnabled = !!(snapshot.settings && snapshot.settings.votingEnabled);
     addingEnabled = !!(snapshot.settings && snapshot.settings.addingEnabled);
@@ -540,6 +553,7 @@ function initApp() {
         <div id="top-right-controls">
             <div id="add-item-btn" title="Add New Tool">+ New Tool</div>
             <div id="view-mode-btn" title="Toggle 1D/2D View">2D</div>
+            <div id="timeline-btn" title="Open Voting History Timeline & Playback">Timeline</div>
             <div id="branch-filter-container">
                 <div id="branch-filter-btn" title="Filter by Branch">Branch ▾</div>
                 <div id="branch-filter-dropdown" style="display: none;"></div>
@@ -547,6 +561,38 @@ function initApp() {
             <div id="search-container">
                 <span id="search-icon">🔍</span>
                 <input type="search" id="search-input" placeholder="Search..." enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            </div>
+        </div>
+        <!-- TIMELINE SCRUBBER OVERLAY -->
+        <div id="timeline-bar" class="timeline-bar" style="display: none;">
+            <div class="timeline-controls-left">
+                <button id="timeline-play-btn" class="timeline-ctrl-btn" title="Play / Pause Timeline">
+                    <svg class="timeline-play-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    <svg class="timeline-pause-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+                        <rect x="6" y="4" width="4" height="16"></rect>
+                        <rect x="14" y="4" width="4" height="16"></rect>
+                    </svg>
+                </button>
+                <div class="timeline-date-display">
+                    <span id="timeline-date-label">Today</span>
+                    <span id="timeline-sub-label" class="timeline-sub-label">Live</span>
+                </div>
+            </div>
+            <div class="timeline-slider-wrapper">
+                <div class="timeline-track-bg">
+                    <div id="timeline-progress-fill" class="timeline-progress"></div>
+                </div>
+                <div id="timeline-activity-markers" class="timeline-markers"></div>
+                <input type="range" id="timeline-slider" min="0" max="100" value="100" step="0.1" aria-label="Voting History Timeline" />
+            </div>
+            <div class="timeline-controls-right">
+                <button id="timeline-live-btn" class="timeline-live-pill active" title="Jump to Current Live Consensus">
+                    <span class="live-pulse-dot"></span>
+                    <span>LIVE</span>
+                </button>
+                <button id="timeline-close-btn" class="timeline-close-btn" title="Close Timeline">✕</button>
             </div>
         </div>
         <div id="onboarding-overlay" class="onboarding-overlay" style="display: none;">
@@ -614,6 +660,65 @@ function initApp() {
             container.classList.remove("mode-1d");
         }
     };
+
+    // Setup Timeline Controls
+    const timelineBtn = document.getElementById("timeline-btn");
+    if (timelineBtn) {
+        timelineBtn.onclick = () => {
+            if (isTimelineOpen) closeTimeline();
+            else openTimeline();
+        };
+    }
+
+    const timelinePlayBtn = document.getElementById("timeline-play-btn");
+    if (timelinePlayBtn) {
+        timelinePlayBtn.onclick = () => {
+            if (isTimelinePlaying) pauseTimeline();
+            else playTimeline();
+        };
+    }
+
+    const timelineSlider = document.getElementById("timeline-slider");
+    if (timelineSlider) {
+        timelineSlider.oninput = (e) => {
+            pauseTimeline();
+            const pct = parseFloat(e.target.value) || 0;
+            applyTimelinePosition(pct, { fromSliderInput: true });
+        };
+    }
+
+    const timelineLiveBtn = document.getElementById("timeline-live-btn");
+    if (timelineLiveBtn) {
+        timelineLiveBtn.onclick = () => jumpToLive();
+    }
+
+    const timelineCloseBtn = document.getElementById("timeline-close-btn");
+    if (timelineCloseBtn) {
+        timelineCloseBtn.onclick = () => closeTimeline();
+    }
+
+    const sliderWrapper = container.querySelector(".timeline-slider-wrapper");
+    if (sliderWrapper) {
+        sliderWrapper.addEventListener("pointermove", (e) => {
+            const markers = sliderWrapper.querySelectorAll(".timeline-marker");
+            let hoveredMarker = null;
+            markers.forEach((m) => {
+                const rect = m.getBoundingClientRect();
+                const dist = Math.hypot(e.clientX - (rect.left + rect.width / 2), e.clientY - (rect.top + rect.height / 2));
+                if (dist < 14) {
+                    hoveredMarker = m;
+                }
+            });
+            markers.forEach((m) => {
+                if (m === hoveredMarker) m.classList.add("hover");
+                else m.classList.remove("hover");
+            });
+        });
+        sliderWrapper.addEventListener("pointerleave", () => {
+            const markers = sliderWrapper.querySelectorAll(".timeline-marker");
+            markers.forEach((m) => m.classList.remove("hover"));
+        });
+    }
 
     // Re-bind Onboarding controls
     setupOnboardingEventListeners();
@@ -724,9 +829,20 @@ function initApp() {
         scheduleResolveLabels();
         // Render / refresh the tool panel list
         renderToolPanel();
+        if (isTimelineOpen) {
+            buildTimelineData();
+        }
     }
 
     function applyVotes(data) {
+        latestLiveVotes = data;
+        if (isTimelineOpen) {
+            buildTimelineData();
+            if (isAtLiveTimestamp()) {
+                updateGraphFromData(data || {}, container);
+            }
+            return;
+        }
         updateGraphFromData(data || {}, container);
     }
 
@@ -1570,18 +1686,25 @@ function setupDrag(avgDot, userDot, item, container) {
                 x: Math.round(x * 10) / 10,
                 y: Math.round(targetY * 10) / 10,
                 username: userDisplayName,
+                timestamp: Date.now(),
             });
         } else {
             set(ref(db, "votes/" + item.id + "/" + currentUser.uid), {
                 x: Math.round(x * 10) / 10,
                 y: Math.round(y * 10) / 10,
                 username: userDisplayName,
+                timestamp: Date.now(),
             });
         }
     }, 50);
 
     const startDrag = function (clientX, clientY, targetElement, originalEvent) {
         if (!currentUser || isConfirmingVote) return;
+
+        if (isTimelineOpen && !isAtLiveTimestamp()) {
+            showToast("Scrub to Live to vote");
+            return;
+        }
 
         // Block drag if clicking interactive controls inside tooltip
         if (originalEvent && originalEvent.target) {
@@ -1660,80 +1783,82 @@ function setupDrag(avgDot, userDot, item, container) {
         }
 
         function onTouchMove(event) {
-            if (event.touches.length === 1) {
-                const touch = event.touches[0];
-                moveAt(touch.clientX, touch.clientY);
+            if (event.touches.length > 0) {
+                moveAt(event.touches[0].clientX, event.touches[0].clientY);
             }
         }
 
         function endDrag() {
             document.removeEventListener("mousemove", onMouseMove);
-            document.removeEventListener("touchmove", onTouchMove);
             document.onmouseup = null;
+            document.removeEventListener("touchmove", onTouchMove);
             document.ontouchend = null;
+            document.ontouchcancel = null;
 
-            const wasDragging = isDragging;
-            isDragging = null;
-            activeDot.classList.remove("dragging");
-            activeDot.style.transition = "";
-            activeDot.style.zIndex = "";
+            if (isDragging === item.id) {
+                isDragging = null;
+                activeDot.classList.remove("dragging");
+                activeDot.style.transition = "";
+                activeDot.style.zIndex = "";
 
-            if (activeDot.dataset.tempX) {
-                let x = parseFloat(activeDot.dataset.tempX);
-                let y = parseFloat(activeDot.dataset.tempY);
-                if (viewMode === "1D") {
-                    let targetY = 50;
-                    const itemVotes = previousData[item.id] || {};
-                    if (itemVotes[currentUser.uid]) {
-                        targetY = itemVotes[currentUser.uid].y;
-                    } else {
-                        const avgDotDom = document.getElementById(`dot-${item.id}`);
-                        if (avgDotDom) {
-                            const currentBottom = avgDotDom.dataset.realY;
-                            if (currentBottom != null) targetY = parseFloat(currentBottom);
-                            else targetY = item.y;
+                if (activeDot.dataset.tempX) {
+                    let x = parseFloat(activeDot.dataset.tempX);
+                    let y = parseFloat(activeDot.dataset.tempY);
+                    if (viewMode === "1D") {
+                        let targetY = 50;
+                        const itemVotes = previousData[item.id] || {};
+                        if (itemVotes[currentUser.uid]) {
+                            targetY = itemVotes[currentUser.uid].y;
+                        } else {
+                            const avgDotDom = document.getElementById(`dot-${item.id}`);
+                            if (avgDotDom) {
+                                const currentBottom = avgDotDom.dataset.realY;
+                                if (currentBottom != null) targetY = parseFloat(currentBottom);
+                                else targetY = item.y;
+                            }
                         }
+                        y = targetY;
                     }
-                    y = targetY;
-                }
 
-                set(ref(db, "votes/" + item.id + "/" + currentUser.uid), {
-                    x: Math.round(x * 10) / 10,
-                    y: Math.round(y * 10) / 10,
-                    username: userDisplayName,
-                });
+                    set(ref(db, "votes/" + item.id + "/" + currentUser.uid), {
+                        x: Math.round(x * 10) / 10,
+                        y: Math.round(y * 10) / 10,
+                        username: userDisplayName,
+                        timestamp: Date.now(),
+                    });
 
-                // --- SHOW CONFIRMATION MODAL ---
-                isConfirmingVote = true;
-                const modal = document.getElementById("confirm-vote-modal");
-                const title = document.getElementById("confirm-vote-title");
-                const stats = document.getElementById("confirm-vote-stats");
-                const nameSection = document.getElementById(
-                    "confirm-vote-username-section",
-                );
-                const nameInput = document.getElementById(
-                    "confirm-vote-username-input",
-                );
+                    // --- SHOW CONFIRMATION MODAL ---
+                    isConfirmingVote = true;
+                    const modal = document.getElementById("confirm-vote-modal");
+                    const title = document.getElementById("confirm-vote-title");
+                    const stats = document.getElementById("confirm-vote-stats");
+                    const nameSection = document.getElementById(
+                        "confirm-vote-username-section",
+                    );
+                    const nameInput = document.getElementById(
+                        "confirm-vote-username-input",
+                    );
 
-                modal.dataset.itemId = item.id;
-                title.innerText = `Vote for ${item.name}`;
-                stats.innerHTML = `
-                    <div style="margin-top:10px;">
-                        <strong>Generative:</strong> ${Math.round(x)}%<br>
-                        <strong>Readiness:</strong> ${Math.round(y)}%
-                    </div>
-                `;
+                    modal.dataset.itemId = item.id;
+                    title.innerText = `Vote for ${item.name}`;
+                    stats.innerHTML = `
+                        <div style="margin-top:10px;">
+                            <strong>Generative:</strong> ${Math.round(x)}%<br>
+                            <strong>Readiness:</strong> ${Math.round(y)}%
+                        </div>
+                    `;
 
-                if (!hasConfirmedName) {
-                    nameSection.style.display = "block";
-                    nameInput.value = userDisplayName;
-                } else {
-                    nameSection.style.display = "none";
-                }
+                    if (!hasConfirmedName) {
+                        nameSection.style.display = "block";
+                        nameInput.value = userDisplayName;
+                    } else {
+                        nameSection.style.display = "none";
+                    }
 
-                modal.style.display = "flex";
-                if (!hasConfirmedName && nameSection.style.display !== "none") {
-                    setTimeout(() => nameInput.focus(), 100);
+                    modal.style.display = "flex";
+                    if (!hasConfirmedName && nameSection.style.display !== "none") {
+                        setTimeout(() => nameInput.focus(), 100);
+                    }
                 }
             }
         }
@@ -2315,6 +2440,514 @@ window.editItem = (id) => {
     
     modal.style.display = "flex";
 };
+
+// --- TIMELINE SCRUBBER & PLAYBACK ENGINE ---
+
+function getItemCreationTimestamp(itemId, item) {
+    if (itemId && itemId.startsWith("user_item_")) {
+        const parsed = parseInt(itemId.replace("user_item_", ""), 10);
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+    if (item && item.createdAt) return item.createdAt;
+    if (item && item.timestamp) return item.timestamp;
+    // Base items seeded at project launch
+    return new Date("2026-01-17T00:00:00Z").getTime();
+}
+
+// In-memory cache of inferred user session timestamps so we calculate them once per build
+let userSessionTimestampsCache = {};
+
+// Baseline snapshot voters captured prior to the August 15 voting session
+const BASELINE_SNAPSHOT_UIDS = new Set([
+    "0tn0mDj4HOgf5UhinlCi7CvDOk13", "1NNDJHWh5DOXYrmhP1QfwahR1n62",
+    "76jSsm0UI5f7m0BKNF9VJMsdDc83", "7T8SclBHHpgLCR1F92pa3F9dZrp2",
+    "94is7USmiGNgQgLqy7vGwUXOHBJ3", "9uAhHIP2QXd9nkFIRQt75C35g5r2",
+    "AKWGfKJEtHP1WXz2zEKuQ82ZIY73", "JxpPLh8qKlgzVsiEEbOciln4z1x1",
+    "L8HYrfj2qyMReIPWI4nJz6CgDYJ3", "UB6TZ5YEnMPMtzM1wwdpBU9qMzG2",
+    "YKL5jdKqDba525cosjG5ao5w0Wl2", "gAOpJXK3TTPYlISiKTwi02MuOl52",
+    "iIRD8oTraXfQnJc36OeKXcvJjVt2", "kwhj81G4pfWPTDHge13wOIwA5hb2",
+    "mA7Bgc3BSdgrMGRz6r48qLGJ1yB3", "oi14FQpMG8U1QAmvc6ZCfnlZlpq1",
+    "sQmcrde3fla7B0kj1CedL9EtJzv2", "uVWG6wAXviYp4azo9uqOM2tQRIT2",
+    "vpodBq4BKrUYEPh0EUNmxjnoiW73", "wuELvwgy1nTSewKE3ldKDxJOaCC3",
+    "xnSXjsXluCT5QM285duZasGsWMR2", "xvxz2VUxN6QLJQcoDCpSNVacwWu1",
+    "zOxtZK2qvfbIYyfayL1DSEPQ69I3"
+]);
+
+function buildUserSessionTimestamps(items, votes) {
+    const itemDates = {};
+    Object.keys(items || {}).forEach((id) => {
+        itemDates[id] = getItemCreationTimestamp(id, items[id]);
+    });
+
+    const userTimestamps = {};
+    const aug15Users = [];
+
+    // 1. Scan historical snapshot votes to map each user to the latest tool session they voted on
+    Object.keys(votes || {}).forEach((itemId) => {
+        const vMap = votes[itemId] || {};
+        Object.keys(vMap).forEach((uid) => {
+            const v = vMap[uid];
+            if (v && v.timestamp) {
+                userTimestamps[uid] = v.timestamp;
+                return;
+            }
+            if (BASELINE_SNAPSHOT_UIDS.has(uid)) {
+                // Historical voter from Jan - Jun 2026 milestones
+                const t = itemDates[itemId] || new Date("2026-01-17T00:00:00Z").getTime();
+                if (!userTimestamps[uid] || t > userTimestamps[uid]) {
+                    userTimestamps[uid] = t;
+                }
+            } else {
+                // Voter who joined during August 15 session
+                if (!aug15Users.includes(uid)) aug15Users.push(uid);
+            }
+        });
+    });
+
+    // 2. For Aug 15 session voters, stagger their timestamps across the Aug 15 voting session window
+    // (18:30 to 20:30 UTC) so that as you scrub through Aug 15, votes arrive incrementally and animate!
+    const AUG15_START = new Date("2026-08-15T18:30:00Z").getTime();
+    const AUG15_END = new Date("2026-08-15T20:30:00Z").getTime();
+    aug15Users.forEach((uid, idx) => {
+        if (!userTimestamps[uid]) {
+            const step = (AUG15_END - AUG15_START) / Math.max(1, aug15Users.length);
+            userTimestamps[uid] = Math.round(AUG15_START + idx * step);
+        }
+    });
+
+    userSessionTimestampsCache = userTimestamps;
+    return userTimestamps;
+}
+
+function getVoteTimestamp(itemId, uid, vote) {
+    if (vote && vote.timestamp) return vote.timestamp;
+    if (vote && vote.createdAt) return vote.createdAt;
+    if (userSessionTimestampsCache[uid]) return userSessionTimestampsCache[uid];
+    return new Date("2026-01-17T00:00:00Z").getTime();
+}
+
+function computeConsensus(item, votesMap) {
+    if (!item) return { x: 50, y: 50 };
+    let totalX = item.x * 10;
+    let totalY = item.y * 10;
+    let count = 10;
+    if (votesMap) {
+        Object.values(votesMap).forEach((vote) => {
+            totalX += vote.x;
+            totalY += vote.y;
+            count++;
+        });
+    }
+    return {
+        x: totalX / count,
+        y: totalY / count,
+    };
+}
+
+function isAtLiveTimestamp() {
+    return !isTimelineOpen || (currentTimelineTimestamp >= timelineMaxTime - 5000);
+}
+
+function formatTimelineDate(timestamp) {
+    const d = new Date(timestamp);
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const month = months[d.getMonth()];
+    const day = d.getDate();
+    const year = d.getFullYear();
+    let hours = d.getHours();
+    const minutes = d.getMinutes().toString().padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+    return {
+        dateStr: `${month} ${day}, ${year}`,
+        timeStr: `${hours}:${minutes} ${ampm}`,
+        fullStr: `${month} ${day}, ${year} ${hours}:${minutes} ${ampm}`,
+    };
+}
+
+function buildTimelineData() {
+    const items = itemsCache || {};
+    const votes = latestLiveVotes || previousData || {};
+
+    // Compute user session timestamps across all historical milestones and staggered sessions
+    buildUserSessionTimestamps(items, votes, baselineSnapshot);
+
+    let minT = Infinity;
+    let maxT = -Infinity;
+    const events = [];
+
+    // 1. Gather item events
+    Object.keys(items).forEach((itemId) => {
+        const item = items[itemId];
+        const t = getItemCreationTimestamp(itemId, item);
+        minT = Math.min(minT, t);
+        maxT = Math.max(maxT, t);
+        events.push({ type: "item", id: itemId, name: item.name, time: t });
+    });
+
+    // 2. Gather vote events
+    Object.keys(votes).forEach((itemId) => {
+        const vMap = votes[itemId] || {};
+        Object.keys(vMap).forEach((uid) => {
+            const v = vMap[uid];
+            const t = getVoteTimestamp(itemId, uid, v);
+            minT = Math.min(minT, t);
+            maxT = Math.max(maxT, t);
+            events.push({ type: "vote", itemId, uid, time: t });
+        });
+    });
+
+    if (minT === Infinity) minT = new Date("2026-01-17T00:00:00Z").getTime();
+    maxT = Math.max(maxT, Date.now());
+
+    timelineMinTime = minT;
+    timelineMaxTime = maxT;
+
+    // 3. Group by distinct days for visual markers
+    const dayGroups = {};
+    events.forEach((ev) => {
+        const dayKey = new Date(ev.time).toISOString().split("T")[0];
+        if (!dayGroups[dayKey]) {
+            dayGroups[dayKey] = {
+                dayKey,
+                time: ev.time,
+                items: 0,
+                votes: 0,
+                itemNames: [],
+            };
+        }
+        if (ev.type === "item") {
+            dayGroups[dayKey].items++;
+            dayGroups[dayKey].itemNames.push(ev.name);
+        }
+        if (ev.type === "vote") {
+            dayGroups[dayKey].votes++;
+        }
+    });
+
+    renderTimelineMarkers(Object.values(dayGroups));
+}
+
+function renderTimelineMarkers(groups) {
+    const markersContainer = document.getElementById("timeline-activity-markers");
+    if (!markersContainer) return;
+    markersContainer.innerHTML = "";
+
+    const span = Math.max(1, timelineMaxTime - timelineMinTime);
+
+    groups.forEach((g) => {
+        const pct = Math.max(0, Math.min(100, ((g.time - timelineMinTime) / span) * 100));
+        const marker = document.createElement("div");
+        marker.className = "timeline-marker";
+        // Calculate exact center matching the slider thumb track travel (insets 9px from edges)
+        marker.style.left = `calc(9px + (100% - 18px) * ${(pct / 100).toFixed(4)})`;
+
+        const tick = document.createElement("div");
+        tick.className = "timeline-marker-tick";
+        marker.appendChild(tick);
+
+        const dot = document.createElement("div");
+        dot.className = "timeline-marker-dot";
+        marker.appendChild(dot);
+
+        const { dateStr } = formatTimelineDate(g.time);
+        let desc = `${dateStr}: `;
+        const details = [];
+        if (g.items > 0) details.push(`${g.items} tool${g.items > 1 ? "s" : ""} added`);
+        if (g.votes > 0) details.push(`${g.votes} vote${g.votes > 1 ? "s" : ""}`);
+        desc += details.join(", ") || "Activity recorded";
+
+        const tooltip = document.createElement("div");
+        tooltip.className = "timeline-marker-tooltip";
+        tooltip.textContent = desc;
+        marker.appendChild(tooltip);
+
+        marker.onclick = (e) => {
+            e.stopPropagation();
+            pauseTimeline();
+            const slider = document.getElementById("timeline-slider");
+            if (slider) slider.value = pct.toFixed(1);
+            applyTimelinePosition(pct, { skipSplashes: false, direction: 1 });
+        };
+
+        markersContainer.appendChild(marker);
+    });
+}
+
+function applyTimelinePosition(sliderPercent, options = {}) {
+    const span = timelineMaxTime - timelineMinTime;
+    const targetTime = timelineMinTime + (sliderPercent / 100) * span;
+    applyTimelineTimestamp(targetTime, options);
+}
+
+function applyTimelineTimestamp(targetTime, options = {}) {
+    const container = document.getElementById("graph-container");
+    if (!container) return;
+
+    const span = Math.max(1, timelineMaxTime - timelineMinTime);
+    const sliderPercent = Math.max(0, Math.min(100, ((targetTime - timelineMinTime) / span) * 100));
+
+    const slider = document.getElementById("timeline-slider");
+    if (slider && !options.fromSliderInput) {
+        slider.value = sliderPercent.toFixed(1);
+    }
+
+    const progressFill = document.getElementById("timeline-progress-fill");
+    if (progressFill) {
+        progressFill.style.width = sliderPercent.toFixed(1) + "%";
+    }
+
+    // Direction tracking for splash triggers
+    const direction = options.direction !== undefined ? options.direction : (targetTime >= lastScrubTimestamp ? 1 : -1);
+    lastScrubTimestamp = targetTime;
+    currentTimelineTimestamp = targetTime;
+
+    const isLive = sliderPercent >= 99.8 || targetTime >= timelineMaxTime - 10000;
+
+    // Update Date Display
+    const dateLabel = document.getElementById("timeline-date-label");
+    const timeLabel = document.getElementById("timeline-sub-label");
+    const livePill = document.getElementById("timeline-live-btn");
+
+    if (dateLabel && timeLabel) {
+        if (isLive) {
+            dateLabel.innerText = "Today";
+            timeLabel.innerText = "Live";
+        } else {
+            const f = formatTimelineDate(targetTime);
+            dateLabel.innerText = f.dateStr;
+            timeLabel.innerText = f.timeStr;
+        }
+    }
+
+    if (livePill) {
+        if (isLive) livePill.classList.add("active");
+        else livePill.classList.remove("active");
+    }
+
+    if (isLive) {
+        container.classList.remove("mode-timeline");
+    } else {
+        container.classList.add("mode-timeline");
+    }
+
+    const items = itemsCache || {};
+    const allVotes = latestLiveVotes || previousData || {};
+
+    renderedItems.forEach((itemId) => {
+        const item = items[itemId];
+        const dot = document.getElementById(`dot-${itemId}`);
+        const panelRow = document.getElementById(`panel-row-${itemId}`);
+        if (!item || !dot) return;
+
+        const itemCreated = getItemCreationTimestamp(itemId, item);
+        const isActive = itemCreated <= targetTime;
+
+        if (!isActive) {
+            // Item was created in the future -> Hide
+            if (visibleItemIdsAtCurrentTime.has(itemId)) {
+                visibleItemIdsAtCurrentTime.delete(itemId);
+            }
+            dot.style.transition = "opacity 0.25s ease";
+            dot.style.opacity = "0";
+            dot.style.pointerEvents = "none";
+            if (panelRow) panelRow.style.display = "none";
+        } else {
+            // Item was active at this historical time
+            const isNewlyRevealed = !visibleItemIdsAtCurrentTime.has(itemId);
+            visibleItemIdsAtCurrentTime.add(itemId);
+
+            dot.style.opacity = "1";
+            dot.style.pointerEvents = isLive ? "" : "none";
+            if (panelRow) panelRow.style.display = "";
+
+            // Gather votes that occurred before or at targetTime
+            const itemVotes = allVotes[itemId] || {};
+            const activeVotes = {};
+            Object.keys(itemVotes).forEach((uid) => {
+                const v = itemVotes[uid];
+                const voteTime = getVoteTimestamp(itemId, uid, v);
+                if (voteTime <= targetTime) {
+                    activeVotes[uid] = v;
+                }
+            });
+
+            // Compute consensus for active votes
+            const cons = computeConsensus(item, activeVotes);
+            let targetX = cons.x;
+            let targetY = viewMode === "1D" ? 50 : cons.y;
+
+            // Dot movement animation
+            if (options.immediate) {
+                dot.style.transition = "none";
+            } else if (isTimelinePlaying) {
+                dot.style.transition = "left 0.1s linear, bottom 0.1s linear, background-color 0.2s";
+            } else {
+                dot.style.transition = "left 0.3s ease-out, bottom 0.3s ease-out, background-color 0.3s";
+            }
+
+            updateElementPosition(dot, targetX, targetY);
+            updateDotColor(dot, targetY);
+            const label = document.getElementById(`label-${itemId}`);
+            if (label) updateLabelPosition(label, targetY);
+
+            // Update Tooltip values
+            const valX = document.getElementById(`val-x-${itemId}`);
+            const valY = document.getElementById(`val-y-${itemId}`);
+            if (valX) valX.innerText = Math.round(targetX);
+            if (valY) valY.innerText = Math.round(targetY);
+
+            // Update Panel Metric Bars
+            const barGen = document.getElementById(`bar-gen-${itemId}`);
+            const barReady = document.getElementById(`bar-ready-${itemId}`);
+            const numGen = document.getElementById(`num-gen-${itemId}`);
+            const numReady = document.getElementById(`num-ready-${itemId}`);
+            if (barGen) barGen.style.width = Math.round(targetX) + "%";
+            if (barReady) {
+                barReady.style.width = Math.round(targetY) + "%";
+                barReady.style.backgroundColor = readinessColor(targetY);
+            }
+            const rowNum = document.getElementById(`rownum-${itemId}`);
+            if (rowNum) {
+                const rc = readinessColor(targetY);
+                rowNum.style.backgroundColor = rc;
+                rowNum.style.borderColor = rc;
+            }
+            if (numGen) numGen.textContent = Math.round(targetX) + "%";
+            if (numReady) numReady.textContent = Math.round(targetY) + "%";
+
+            // Trigger splash for newly introduced tools when scrubbing/playing forward!
+            if (isNewlyRevealed && direction > 0 && !options.skipSplashes) {
+                if (itemId.startsWith("user_item_")) {
+                    triggerMegaSplash(container, targetX, targetY);
+                }
+            }
+        }
+    });
+
+    if (isLive) {
+        scheduleResolveLabels();
+    }
+}
+
+async function openTimeline() {
+    isTimelineOpen = true;
+    const bar = document.getElementById("timeline-bar");
+    const btn = document.getElementById("timeline-btn");
+    const container = document.getElementById("graph-container");
+    if (btn) btn.classList.add("active");
+    if (bar) bar.style.display = "flex";
+
+    closeAllTooltips();
+
+    if (!baselineSnapshot) {
+        try {
+            const res = await fetch("./data/snapshot.json", { cache: "no-cache" });
+            if (res.ok) baselineSnapshot = await res.json();
+        } catch (e) {
+            console.warn("Could not load snapshot for timeline baseline", e);
+        }
+    }
+
+    buildTimelineData();
+
+    // Set slider to 100% (Live) initially
+    applyTimelinePosition(100, { skipSplashes: true, isLive: true });
+}
+
+function closeTimeline() {
+    isTimelineOpen = false;
+    pauseTimeline();
+    const bar = document.getElementById("timeline-bar");
+    const btn = document.getElementById("timeline-btn");
+    const container = document.getElementById("graph-container");
+    if (btn) btn.classList.remove("active");
+    if (bar) bar.style.display = "none";
+    if (container) container.classList.remove("mode-timeline");
+
+    jumpToLive();
+}
+
+function playTimeline() {
+    if (isTimelinePlaying) return;
+    const slider = document.getElementById("timeline-slider");
+    if (!slider) return;
+
+    if (parseFloat(slider.value) >= 99.5) {
+        slider.value = "0";
+        applyTimelinePosition(0, { skipSplashes: true, immediate: true });
+    }
+
+    isTimelinePlaying = true;
+    updatePlayPauseIcons(true);
+
+    let lastTime = performance.now();
+    const PLAY_SPEED = 10; // Percent per second (~10s total duration)
+
+    function step(now) {
+        if (!isTimelinePlaying) return;
+        const delta = (now - lastTime) / 1000;
+        lastTime = now;
+
+        const currentPct = parseFloat(slider.value) || 0;
+        const nextPct = currentPct + delta * PLAY_SPEED;
+
+        if (nextPct >= 100) {
+            slider.value = "100";
+            applyTimelinePosition(100, { direction: 1, skipSplashes: false });
+            pauseTimeline();
+            jumpToLive();
+            return;
+        }
+
+        slider.value = nextPct.toFixed(2);
+        applyTimelinePosition(nextPct, { direction: 1, skipSplashes: false });
+        timelineAnimationId = requestAnimationFrame(step);
+    }
+
+    timelineAnimationId = requestAnimationFrame(step);
+}
+
+function pauseTimeline() {
+    isTimelinePlaying = false;
+    if (timelineAnimationId) {
+        cancelAnimationFrame(timelineAnimationId);
+        timelineAnimationId = null;
+    }
+    updatePlayPauseIcons(false);
+}
+
+function updatePlayPauseIcons(isPlaying) {
+    const playIcon = document.querySelector(".timeline-play-icon");
+    const pauseIcon = document.querySelector(".timeline-pause-icon");
+    if (playIcon) playIcon.style.display = isPlaying ? "none" : "block";
+    if (pauseIcon) pauseIcon.style.display = isPlaying ? "block" : "none";
+}
+
+function jumpToLive() {
+    pauseTimeline();
+    const slider = document.getElementById("timeline-slider");
+    if (slider) slider.value = "100";
+
+    const container = document.getElementById("graph-container");
+    if (container) container.classList.remove("mode-timeline");
+
+    applyTimelinePosition(100, { skipSplashes: true, isLive: true });
+
+    // Restore full live state and clear inline transitions
+    renderedItems.forEach((itemId) => {
+        const dot = document.getElementById(`dot-${itemId}`);
+        if (dot) {
+            dot.style.transition = "";
+            dot.style.opacity = "1";
+            dot.style.pointerEvents = "";
+        }
+    });
+
+    const votesData = latestLiveVotes || previousData;
+    if (container) updateGraphFromData(votesData, container);
+    scheduleResolveLabels();
+}
 
 // --- INTERACTIVE ONBOARDING CONTROLLER ---
 const ONBOARD_TOOLS = [

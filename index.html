@@ -59,6 +59,7 @@
             <div id="top-right-controls">
                 <div id="add-item-btn" title="Add New Tool">+ New Tool</div>
                 <div id="view-mode-btn" title="Toggle 1D/2D View">2D</div>
+                <div id="timeline-btn" title="Open Voting History Timeline & Playback">Timeline</div>
                 <div id="branch-filter-container">
                     <div id="branch-filter-btn" title="Filter by Branch">Branch ▾</div>
                     <div id="branch-filter-dropdown" style="display: none;"></div>
@@ -66,6 +67,39 @@
                 <div id="search-container">
                     <span id="search-icon">🔍</span>
                     <input type="search" id="search-input" placeholder="Search..." enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+                </div>
+            </div>
+
+            <!-- TIMELINE SCRUBBER OVERLAY -->
+            <div id="timeline-bar" class="timeline-bar" style="display: none;">
+                <div class="timeline-controls-left">
+                    <button id="timeline-play-btn" class="timeline-ctrl-btn" title="Play / Pause Timeline">
+                        <svg class="timeline-play-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                        <svg class="timeline-pause-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+                            <rect x="6" y="4" width="4" height="16"></rect>
+                            <rect x="14" y="4" width="4" height="16"></rect>
+                        </svg>
+                    </button>
+                    <div class="timeline-date-display">
+                        <span id="timeline-date-label">Today</span>
+                        <span id="timeline-time-label" class="timeline-sub-label">Live</span>
+                    </div>
+                </div>
+                <div class="timeline-slider-wrapper">
+                    <div class="timeline-track-bg">
+                        <div id="timeline-progress-fill" class="timeline-progress"></div>
+                    </div>
+                    <div id="timeline-activity-markers" class="timeline-markers"></div>
+                    <input type="range" id="timeline-slider" min="0" max="100" value="100" step="0.1" aria-label="Voting History Timeline" />
+                </div>
+                <div class="timeline-controls-right">
+                    <button id="timeline-live-btn" class="timeline-live-pill active" title="Jump to Current Live Consensus">
+                        <span class="live-pulse-dot"></span>
+                        <span>LIVE</span>
+                    </button>
+                    <button id="timeline-close-btn" class="timeline-close-btn" title="Close Timeline">✕</button>
                 </div>
             </div>
 

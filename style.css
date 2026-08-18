@@ -1418,13 +1418,27 @@ body.onboarding-active #tool-panel-header {
     pointer-events: none;
     opacity: 0;
     transition:
-        opacity 2s ease-in-out,
         bottom 3s ease-in-out,
         left 3s ease-in-out;
 }
 
 .voter-dot.visible {
-    opacity: 1;
+    animation: voter-dot-decay 3.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes voter-dot-decay {
+    0% {
+        opacity: 1;
+        transform: translate(-50%, 50%) scale(1.3);
+    }
+    12% {
+        opacity: 0.95;
+        transform: translate(-50%, 50%) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, 50%) scale(0.85);
+    }
 }
 
 .voter-username {
@@ -1439,11 +1453,25 @@ body.onboarding-active #tool-panel-header {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     opacity: 0;
-    transition: opacity 2s ease-in-out;
 }
 
-.voter-username.visible {
-    opacity: 0.8;
+.voter-dot.visible .voter-username {
+    animation: voter-username-decay 3.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes voter-username-decay {
+    0% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(-2px);
+    }
+    15% {
+        opacity: 0.9;
+        transform: translateX(-50%) translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(2px);
+    }
 }
 
 .user-dot .voter-username {

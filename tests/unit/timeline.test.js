@@ -125,6 +125,20 @@ describe("timeline-engine", () => {
             expect(voterDot).not.toBeNull();
             expect(voterDot.classList.contains("visible")).toBe(true);
         });
+
+        it("clears visible class when scrubbing backward past a vote arrival timestamp", () => {
+            const AUG15_START = new Date("2026-08-15T18:30:00Z").getTime();
+            const AUG15_END = new Date("2026-08-15T20:30:00Z").getTime();
+
+            // Scrub forward to make it visible
+            applyTimelineTimestamp(AUG15_END, { direction: 1, skipSplashes: false });
+            const voterDot = document.getElementById("voter-dot-tool_01-voterLate");
+            expect(voterDot.classList.contains("visible")).toBe(true);
+
+            // Scrub backward before the vote
+            applyTimelineTimestamp(AUG15_START, { direction: -1 });
+            expect(voterDot.classList.contains("visible")).toBe(false);
+        });
     });
 
     describe("formatTimelineDate", () => {

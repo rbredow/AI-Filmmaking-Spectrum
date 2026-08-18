@@ -238,6 +238,8 @@ export function applyTimelineTimestamp(targetTime, options = {}) {
                         updateElementPosition(vDot, v.x, v.y, container);
                         if (state.viewMode === "1D") vDot.style.bottom = "50%";
 
+                        vDot.classList.remove("visible");
+                        if (typeof vDot.offsetWidth === "number") void vDot.offsetWidth;
                         vDot.classList.add("visible");
                         clearTimeout(vDot.fadeTimeout);
                         vDot.fadeTimeout = setTimeout(() => {

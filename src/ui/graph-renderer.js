@@ -306,6 +306,8 @@ export function updateGraphFromData(allVotes, container, hasLoadedInitialVotes =
                 if (vDot) {
                     const isRecent = vote.timestamp && (Date.now() - vote.timestamp < 120000);
                     if (shouldSplash || isRecent) {
+                        vDot.classList.remove("visible");
+                        if (typeof vDot.offsetWidth === "number") void vDot.offsetWidth;
                         vDot.classList.add("visible");
                         clearTimeout(vDot.fadeTimeout);
                         vDot.fadeTimeout = setTimeout(() => vDot.classList.remove("visible"), FADE_TIME);

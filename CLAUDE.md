@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 Guidance for working in this repo (AI Filmmaking Spectrum).
 
@@ -11,15 +11,20 @@ modules + Firebase Realtime Database (RTDB), served as static files.
 
 - `index.html` — all markup, including every modal (username, vote-confirm,
   add/edit tool, reset, admin panel).
-- `app.js` (~1900 lines) — **all** logic. Firebase init, auth, realtime
-  listeners, rendering, drag/vote handling, label-overlap geometry.
+- `src/` — modular ES6 application code:
+  - `src/main.js` — bootstrap and application coordination.
+  - `src/config/` — `constants.js` (colors, thresholds, seed items), `firebase.js` (SDK handles).
+  - `src/core/` — pure logic modules: `coords.js` (plotting & projections), `consensus.js` (averaging), `clustering.js` (collision detection & fan-out), `colors.js` (spectrum interpolation), `formatters.js` (labels, XSS escaping), `timeline-engine.js` (timestamp inference).
+  - `src/state/` — `app-state.js` (observable state store).
+  - `src/services/` — `auth-service.js` (auth & usernames), `data-service.js` (RTDB & snapshot loader).
+  - `src/ui/` — `graph-renderer.js`, `drag-controller.js`, `mobile-gestures.js`, `tool-panel.js`, `highlight.js`, `modals.js`, `timeline-ui.js`, `onboarding.js`, `toast.js`.
 - `style.css` — all styling.
 - `privacy.html` — standalone privacy policy page.
 
-## Run & deploy
+## Run, test & deploy
 
-- **Dev:** `npm run dev` → `http-server` on `http://localhost:8000`. No build.
-  Just edit a file and reload.
+- **Dev:** `npm run dev` → `http-server` on `http://localhost:8000`. No build. Just edit and reload.
+- **Test:** `npm test` → Vitest suite testing coordinate conversions, consensus math, cluster fan-out, gesture thresholds, and data isolation.
 - **Deploy:** push to `main` → **auto-deploys via GitHub Pages**. There is no
   staging. ⚠️ The app talks to a **live production Firebase database**, so a
   local dev session reads/writes real data shared with everyone. Don't run
@@ -30,12 +35,11 @@ modules + Firebase Realtime Database (RTDB), served as static files.
 
 ## Boot: live when voting is open, snapshot when it's closed
 
-`boot()` (app.js, top) makes ONE read-only REST GET of the live `/settings`
+`boot()` (src/main.js) makes ONE read-only REST GET of the live `/settings`
 ("is voting open?") and branches:
 - **Live mode** — voting is open (or `?live=1`, or the live check failed but the
   snapshot's flag says open): the normal path runs (anon sign-in + the three
-  `onValue` listeners on items/votes/settings). So **flipping voting on in the
-  admin panel takes effect for new visitors immediately — no redeploy needed.**
+  `onValue` listeners on items/votes/settings).
 - **Static mode** — voting is closed: render `data/snapshot.json` once and open
   **no** further Firebase connection (no `onValue`, no RTDB websocket).
   `currentUser` stays null, which gates off every drag/vote/write path.
@@ -46,16 +50,12 @@ Notes:
   this settings check run in parallel.
 - `?live=1` always forces live; admins use it for admin UI + writes, and the
   in-app admin login reloads into `?live=1`.
-- Google Analytics still loads in both modes — that's not the DB. Firebase Auth
-  may also do one `accounts:lookup` to refresh a *persisted* anon session from a
-  prior live visit; it does NOT set `currentUser` in static mode, so writes stay
-  gated.
+- `?preview=1` loads the committed snapshot in local preview mode: dragging and
+  voting are functional on the client with zero writes to production Firebase.
 
 ⚠️ The committed `data/snapshot.json` is what static (voting-closed) visitors see.
-It no longer gates live mode — only the closed-state display. After you **close**
-a voting session, **re-run `npm run snapshot` and commit** to freeze the final
-tally into the static view; otherwise closed-state visitors see the last
-committed snapshot, not the latest results.
+After you **close** a voting session, **re-run `npm run snapshot` and commit** to freeze the final
+tally into the static view.
 
 ### Doing UI work? Read this first
 
@@ -63,90 +63,46 @@ committed snapshot, not the latest results.
   `npm run dev` + `localhost:8000` is ideal. Static mode renders the real 32
   items / 92 votes identically to a live first-paint, with zero prod-DB writes.
 - For **drag-to-vote, the vote-confirm flow, add/edit-tool, or admin UI** — these
-  are inert in static mode (`currentUser` is null, voting/adding are off). Load
-  `localhost:8000/?live=1` to exercise them. ⚠️ `?live=1` writes to the **live
-  prod DB** — don't leave junk votes/tools around.
+  can be tested safely in local preview mode (`localhost:8000/?preview=1`) with zero prod DB writes.
+  Or load `localhost:8000/?live=1` to exercise production live writes.
 - Static first-paint waits on a `fetch` of `data/snapshot.json` before rendering;
   it lands well within the 2s `window.appLaunchTime` guard that suppresses
-  entry animations / `triggerMegaSplash`, so timing matches live. If you add
-  startup animation logic, sanity-check both `/` and `/?live=1`.
+  entry animations / `triggerMegaSplash`, so timing matches live.
 
-## Architecture (for UI work)
+## Architecture
 
-Render is driven (live mode) by RTDB listeners in `initApp()` (app.js:495):
-`onValue` on `items`, `votes`, `settings` → the `applyItems`/`applyVotes`/
-`applySettings` functions → re-render. Static mode calls those same apply
-functions once from the snapshot (see "Boot" above).
-- `createItemElements()` (app.js:1070) — builds each tool's dot + **tooltip**
-  (first render, uses `innerHTML`).
-- `updateItemMetadata()` (app.js:1215) — live updates; uses `innerText` (safe).
-- `updateGraphFromData()` (app.js:1533) — recomputes consensus + voter dots from
-  all votes; main per-update render loop.
-- `setupDrag()` (app.js:1257) — drag-to-vote; writes to `/votes`.
-- `resolveAllLabelOverlaps()` (app.js:1800) — OBB-based label collision avoidance.
-  Fiddly geometry; change carefully and eyeball the result.
+Render is driven by RTDB listeners (in live mode) or single snapshot application (in static mode):
+- `createItemElements()` (src/ui/graph-renderer.js) — builds each tool's dot + tooltip.
+- `updateItemMetadata()` (src/ui/graph-renderer.js) — live updates using `innerText`/`textContent`.
+- `updateGraphFromData()` (src/ui/graph-renderer.js) — recomputes consensus + voter dots from all votes.
+- `setupDrag()` (src/ui/drag-controller.js) — drag-to-vote coordinator for desktop and mobile.
+- `setupMobileGraphInteractions()` (src/ui/mobile-gestures.js) — pinch zoom, panning, and cluster fan-out.
 - **View modes:** 2D (X/Y) and 1D (X only); ~3s animated transition.
 
 ## Interface layout — graph + tool-detail panel (desktop & mobile)
 
 The page is `#header` above `#main-layout`, a flex container holding two
-siblings: `#graph-container` (the scatter) and `#tool-panel` (a scrollable list
-of every tool). **Put nothing new INSIDE `#graph-container` in index.html** —
-`initApp()` rebuilds that element's inner scaffold via `container.innerHTML`
-(~app.js:529, the axis labels + `#top-right-controls`), wiping static children.
-The panel lives OUTSIDE the graph for this reason.
+siblings: `#graph-container` (the scatter) and `#tool-panel` (a scrollable list of every tool).
 
 - **Wide (desktop/landscape):** `#main-layout` is a row — graph (flex-grow) on
   the left, `#tool-panel` (~340px) on the right, each its own height.
 - **Portrait (`max-width:600px`):** `#main-layout` is a column — graph pinned to
   the top (~48dvh), panel fills the rest. On mobile, `html,body` are
   `height:100dvh; overflow:hidden` so **the body never scrolls — only
-  `#tool-panel` scrolls internally** (`overflow-y:auto`, `min-height:0`). This is
-  deliberate: tapping a dot must scroll the panel while the graph stays put.
+  `#tool-panel` scrolls internally** (`overflow-y:auto`, `min-height:0`).
 
-**Panel rows** are built by `renderToolPanel()` (module scope), called at the end
-of `applyItems`. Each row is `#panel-row-<id>` with `data-item-id`, showing name,
-two metric bars (Generative=x, Readiness=y) + %, description, and tag chips. Live
-consensus updates the bars/numbers inside `updateGraphFromData` (ids
-`bar-gen-<id>` / `bar-ready-<id>` / `num-*`) — it does NOT rebuild the list.
+**Panel rows** are built by `renderToolPanel()` (src/ui/tool-panel.js). Each row is `#panel-row-<id>` with `data-item-id`, showing name,
+two metric bars (Generative=x, Readiness=y) + %, description, and tag chips.
 
 **Readiness bar color** is a SOLID color from the value via `readinessColor(y)`
-(near `updateDotColor`), interpolating the same spectrum as the y-axis
-(0% `#ff3d00` red → 50% `#ffea00` yellow → 100% `#00e676` green). Set inline as
-`background-color`; the `.panel-metric-bar-ready` CSS must stay gradient-free or
-it paints over. Generative bar stays blue. If you add a gradient back, the solid
-color breaks.
+(src/core/colors.js), interpolating the same spectrum as the y-axis
+(0% `#ff3d00` red → 50% `#ffea00` yellow → 100% `#00e676` green).
 
 **Highlight (bidirectional locator)** — `highlightItem(id)` / `clearHighlight()`
-(module scope) add `.highlighted` to `dot-<id>` and `.row-active` to its row.
-Hovering a panel row (desktop `mouseenter`) or tapping/clicking a dot highlights;
-tapping a dot ALSO `scrollIntoView({behavior:'smooth', block:'center'})` on its
-row so you watch the list fly to it. The tap path is `setupTapTooltip()`
-(touchend) + a desktop `click` handler on each dot.
-- ⚠️ The highlight must enlarge the dot via **width/height + box-shadow ring,
-  NOT `transform: scale()`**. The `.dot-label` is a child of the dot, so a scale
-  transform balloons the rotated label (a fixed + reverted regression). Keep
-  `.dot.highlighted { transform: translate(-50%,50%) }` (base centering only).
+(src/ui/highlight.js) add `.highlighted` to `dot-<id>` and `.row-active` to its row.
 
 **Typography — one 5-step token scale.** All font sizes come from `:root` vars in
-`style.css`: `--fs-xs:12 / --fs-sm:14 / --fs-base:16 / --fs-lg:18 / --fs-xl:24`
-(px). Rules:
-- Use a token for every `font-size`; **no raw px/rem and no inline `font-size`**
-  (the only exception is the `#add-item-btn { font-size:0 }` + `::before
-  { font-size:20px }` "+" icon glyph hack). Don't reintroduce inline sizes in
-  modals/tooltips.
-- **12px is the floor** — nothing readable smaller (axis labels included; they
-  used to drop to 6–8px on mobile).
-- Roles: `xl`=page title (desktop; `lg` on mobile); `lg`=tool/section names
-  (panel row name, tooltip title, modal h3); `base`=inputs/buttons/tooltip body;
-  `sm`=descriptions, %, voter chip, header links; `xs`=axis labels, tags, metric
-  mini-labels, dot labels.
-- One font family (Segoe UI stack); weights 400/600/700.
-
-For UI verification, drive the browser via chrome-devtools MCP at 1440×900
-(desktop), 390×844 (portrait), 844×390 (landscape). Static mode (`localhost:8000`)
-renders the real 32 items, so layout/fonts/panel match live with zero prod-DB
-writes.
+`style.css`: `--fs-xs:12 / --fs-sm:14 / --fs-base:16 / --fs-lg:18 / --fs-xl:24` (px).
 
 ## Data model (RTDB paths)
 
@@ -156,26 +112,8 @@ writes.
 
 IDs for user-added tools are `"user_item_" + Date.now()`.
 
-## Security & privacy — don't regress these
+## Security & privacy
 
-- **The Firebase config in app.js (apiKey etc.) is public by design.** The real
-  access control is the **RTDB security rules**, configured in the Firebase
-  console (NOT in this repo). Admin gating in JS (`isAdmin`, `ADMIN_EMAIL`,
-  `updateAdminUI` app.js:490) is **cosmetic** — it only shows/hides UI; the rules
-  enforce who can actually write.
-- **XSS: any untrusted value rendered via `innerHTML` MUST go through
-  `escapeHtml()` (app.js:58).** Tool name/desc/tags and voter usernames are
-  user input broadcast to every client. The tooltip and voter-dot renders are
-  already escaped — keep new `innerHTML` that includes these fields escaped, or
-  prefer `textContent`/`innerText`.
-- **Votes and chosen usernames are PUBLIC** and disclosed as such in
-  `privacy.html` and the username/vote-confirm modals. Don't reintroduce
-  "anonymous voting" copy — voting is pseudonymous and visible to all.
-
-## Conventions
-
-- ES module loaded via importmap in `index.html` (Firebase SDK pinned to 10.7.1
-  on gstatic). No package install for runtime deps.
-- Admin actions wired to `window.*` (e.g. `window.deleteItem`) for inline
-  `onclick` handlers in generated tooltip HTML.
-- Commit only when asked; pushing `main` deploys to production.
+- **Firebase config:** public by design; security is enforced by RTDB rules.
+- **XSS:** untrusted values rendered via `innerHTML` must go through `escapeHtml()` (src/core/formatters.js).
+- **Public data:** votes and usernames are public.

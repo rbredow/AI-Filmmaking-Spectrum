@@ -2,7 +2,7 @@
   "name": "ai-filmmaking-spectrum",
   "version": "1.0.0",
   "description": "Interactive spectrum for AI filmmaking tools.",
-  "main": "app.js",
+  "main": "src/main.js",
   "type": "module",
   "scripts": {
     "dev": "npx http-server -p 8000 -c-1",

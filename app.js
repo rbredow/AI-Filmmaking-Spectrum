@@ -44,6 +44,7 @@ let votingEnabled = true;
 let addingEnabled = true;
 let isDragging = null;
 let isConfirmingVote = false; // Prevent interactions during confirmation
+let pendingVoteConfirmation = null;
 let previousData = {};
 let itemsCache = {}; // Local cache of items for weighted calculations
 let svgLayer = null;
@@ -79,6 +80,20 @@ function escapeHtml(value) {
     }[ch]));
 }
 
+// Express each coordinate using the side of the spectrum it actually leans
+// toward. A raw "G 28" reads like "28% Generative", while the same position is
+// more naturally understood as "72% Utility".
+function formatAxisPosition(value, lowLabel, highLabel) {
+    const rounded = Math.round(Math.max(0, Math.min(100, value)));
+    return rounded < 50
+        ? `${100 - rounded}% ${lowLabel}`
+        : `${rounded}% ${highLabel}`;
+}
+
+function formatSpectrumPosition(x, y) {
+    return `${formatAxisPosition(x, "Utility", "Generative")} · ${formatAxisPosition(y, "Not Ready", "Ready")}`;
+}
+
 let userDisplayName = "";
 let hasConfirmedName = false;
 const FADE_TIME = 5000; // 5 seconds
@@ -88,6 +103,26 @@ const INITIAL_SHOW_TIME = 8000; // 8 seconds on launch
 const isTouchDevice = () =>
     window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 const isMobile = () => window.innerWidth <= 600;
+const isMobileGraphExperience = () =>
+    isTouchDevice() &&
+    (window.innerWidth <= 600 ||
+        (window.innerHeight <= 500 && window.innerWidth <= 1000));
+
+const MOBILE_FAN_THRESHOLD = 32;
+const MOBILE_DRAG_THRESHOLD = 12;
+const MOBILE_MIN_ZOOM = 1;
+const MOBILE_MAX_ZOOM = 3.5;
+const MOBILE_PLOT_TOP_INSET = 60;
+const MOBILE_PLOT_BOTTOM_INSET = 32;
+const MOBILE_TIMELINE_PLOT_BOTTOM_INSET = 78;
+let mobileFanItemIds = [];
+let mobileFocusedClusterIds = [];
+let mobileGraphTapStart = null;
+let mobileLabelClampFrame = null;
+let mobileViewportGesture = null;
+let mobileViewAnimationTimer = null;
+const mobileGraphView = { scale: 1, offsetX: 0, offsetY: 0 };
+let mobileGraphReturnView = null;
 
 const COLORS = [
     "Pink",
@@ -329,19 +364,6 @@ function showToast(message) {
     setTimeout(() => toast.remove(), 3000);
 }
 
-function throttle(func, limit) {
-    let inThrottle;
-    return function () {
-        const args = arguments;
-        const context = this;
-        if (!inThrottle) {
-            func.apply(context, args);
-            inThrottle = true;
-            setTimeout(() => (inThrottle = false), limit);
-        }
-    };
-}
-
 // --- BOOTSTRAP ----------------------------------------------------------
 // On load we ask one cheap, read-only question of the LIVE database: "is
 // voting open?" (a single REST GET of /settings, ~tens of bytes, no websocket).
@@ -351,10 +373,14 @@ function throttle(func, limit) {
 //   - Voting CLOSED -> render the committed snapshot (data/snapshot.json) once
 //                     and open no further Firebase connection. currentUser stays
 //                     null, which gates off every drag/vote/write path.
+//   - ?preview=1    -> render that same snapshot with an in-memory local voter so
+//                     the full drag/confirm UI can be reviewed without DB writes.
 // If the live check can't be reached we fall back to the snapshot's own flag,
 // so a network hiccup never strands us. ?live=1 always forces the live path.
 let isStaticMode = false;
 let staticSnapshot = null;
+let isLocalPreviewMode = false;
+const LOCAL_PREVIEW_UID = "local-mobile-preview";
 
 function ensureDisplayName() {
     // Reuse a previously chosen name (for display only — voting needs live mode)
@@ -367,7 +393,9 @@ function ensureDisplayName() {
 }
 
 async function boot() {
-    const forceLive = new URLSearchParams(window.location.search).has("live");
+    const params = new URLSearchParams(window.location.search);
+    const forceLive = params.has("live");
+    const forcePreview = params.has("preview");
 
     // Fetch the committed snapshot (static data) and the LIVE voting flag in
     // parallel. The settings read is a single read-only REST GET, not a
@@ -389,6 +417,18 @@ async function boot() {
         liveSettings != null
             ? liveSettings.votingEnabled === true
             : !!(snapshot && snapshot.settings && snapshot.settings.votingEnabled);
+
+    // Preview always stays on the committed snapshot, even if production voting
+    // happens to open while a phone review is in progress.
+    if (forcePreview) {
+        if (!snapshot) {
+            console.error("Local preview requires data/snapshot.json.");
+            showToast("Preview unavailable — snapshot missing");
+            return;
+        }
+        startStatic(snapshot, true);
+        return;
+    }
 
     // Go live when forced, when voting is open, or when there is no snapshot to
     // fall back on. Otherwise serve the committed snapshot frozen.
@@ -418,18 +458,27 @@ function startLive() {
     });
 }
 
-function startStatic(snapshot) {
-    // No Firebase auth: currentUser stays null, which gates off every drag/
-    // vote/write path. isAdmin is false too — admins use ?live=1 to manage.
+function startStatic(snapshot, enablePreview = false) {
+    // No Firebase auth. Normal static mode keeps currentUser null; preview uses
+    // a local-only identity whose writes are intercepted below. Admins use
+    // ?live=1 to manage production.
     isStaticMode = true;
+    isLocalPreviewMode = enablePreview;
     staticSnapshot = snapshot;
     baselineSnapshot = snapshot;
     isAdmin = false;
-    votingEnabled = !!(snapshot.settings && snapshot.settings.votingEnabled);
-    addingEnabled = !!(snapshot.settings && snapshot.settings.addingEnabled);
+    currentUser = enablePreview ? { uid: LOCAL_PREVIEW_UID } : null;
+    votingEnabled = enablePreview || !!(snapshot.settings && snapshot.settings.votingEnabled);
+    // Static and preview sessions never have a production-backed identity.
+    // Keep every item-management surface disabled even if an older snapshot
+    // happened to capture addingEnabled=true.
+    addingEnabled = false;
     updateAdminUI();
     ensureDisplayName();
     initApp();
+    if (enablePreview) {
+        setTimeout(() => showToast("Local preview — nothing is published"), 250);
+    }
     setTimeout(() => {
         document.body.classList.remove("initial-load");
     }, 2000);
@@ -444,6 +493,16 @@ function updateUsernameUI() {
 
 async function updateAllUserVotes(newName) {
     if (!currentUser) return;
+    if (isLocalPreviewMode) {
+        const nextVotes = JSON.parse(JSON.stringify(previousData));
+        Object.values(nextVotes).forEach((votes) => {
+            if (votes?.[LOCAL_PREVIEW_UID]) {
+                votes[LOCAL_PREVIEW_UID].username = newName;
+            }
+        });
+        updateGraphFromData(nextVotes, document.getElementById("graph-container"));
+        return;
+    }
     const updates = {};
     let hasUpdates = false;
 
@@ -462,6 +521,31 @@ async function updateAllUserVotes(newName) {
             console.error("Failed to update usernames on votes", e);
         }
     }
+}
+
+function setPreviewVote(itemId, vote) {
+    const nextVotes = JSON.parse(JSON.stringify(previousData));
+    if (!nextVotes[itemId]) nextVotes[itemId] = {};
+    nextVotes[itemId][LOCAL_PREVIEW_UID] = vote;
+    updateGraphFromData(nextVotes, document.getElementById("graph-container"));
+}
+
+function saveVote(itemId, vote) {
+    if (isLocalPreviewMode) {
+        setPreviewVote(itemId, vote);
+        return Promise.resolve();
+    }
+    return set(ref(db, "votes/" + itemId + "/" + currentUser.uid), vote);
+}
+
+function allowProductionMutation() {
+    if (!isStaticMode) return true;
+    showToast(
+        isLocalPreviewMode
+            ? "Local preview — production changes are disabled"
+            : "Changes are unavailable in static mode",
+    );
+    return false;
 }
 
 function showUsernamePrompt() {
@@ -526,43 +610,15 @@ function updateAdminUI() {
 function initApp() {
     const container = document.getElementById("graph-container");
 
-    // Setup toggle button logic
-    const toggleBtn = document.getElementById("view-mode-btn");
-    if (toggleBtn) {
-        toggleBtn.onclick = () => {
-            if (viewMode === "2D") {
-                viewMode = "1D";
-                toggleBtn.innerText = "1D";
-                container.classList.add("mode-1d");
-            } else {
-                viewMode = "2D";
-                toggleBtn.innerText = "2D";
-                container.classList.remove("mode-1d");
-            }
-        };
-    }
-
     container.innerHTML = `
         <div class="y-axis-gradient"></div>
+        <div class="x-axis-guide"></div>
         <div class="grid-line grid-x" style="bottom: 50%"></div>
         <div class="grid-line grid-y" style="left: 50%"></div>
         <div class="axis-label x-label-left">← Algorithmic / Utility</div>
         <div class="axis-label x-label-right">Generative / Creative →</div>
         <div class="axis-label y-label-top">Ready</div>
         <div class="axis-label y-label-bottom">Not Ready</div>
-        <div id="top-right-controls">
-            <div id="add-item-btn" title="Add New Tool">+ New Tool</div>
-            <div id="view-mode-btn" title="Toggle 1D/2D View">2D</div>
-            <div id="timeline-btn" title="Open Voting History Timeline & Playback">Timeline</div>
-            <div id="branch-filter-container">
-                <div id="branch-filter-btn" title="Filter by Branch">Branch ▾</div>
-                <div id="branch-filter-dropdown" style="display: none;"></div>
-            </div>
-            <div id="search-container">
-                <span id="search-icon">🔍</span>
-                <input type="search" id="search-input" placeholder="Search..." enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-            </div>
-        </div>
         <!-- TIMELINE SCRUBBER OVERLAY -->
         <div id="timeline-bar" class="timeline-bar" style="display: none;">
             <div class="timeline-controls-left">
@@ -647,9 +703,10 @@ function initApp() {
     `;
     renderedItems.clear();
 
-    // Re-bind Toggle (since we wiped innerHTML)
+    // Bind the persistent view control in the app header.
     document.getElementById("view-mode-btn").onclick = () => {
         const btn = document.getElementById("view-mode-btn");
+        clearMobileFan();
         if (viewMode === "2D") {
             viewMode = "1D";
             btn.innerText = "1D";
@@ -659,6 +716,7 @@ function initApp() {
             btn.innerText = "2D";
             container.classList.remove("mode-1d");
         }
+        resetMobileGraphView(container, false);
     };
 
     // Setup Timeline Controls
@@ -780,6 +838,7 @@ function initApp() {
     svgLayer.setAttribute("viewBox", "0 0 100 100");
     svgLayer.setAttribute("preserveAspectRatio", "none");
     container.appendChild(svgLayer);
+    setupMobileGraphInteractions(container);
 
     setupModalLogic();
     setupEditModalLogic();
@@ -848,8 +907,8 @@ function initApp() {
 
     function applySettings(settings) {
         const s = settings || { votingEnabled: true, addingEnabled: true };
-        votingEnabled = s.votingEnabled;
-        addingEnabled = s.addingEnabled;
+        votingEnabled = isLocalPreviewMode || s.votingEnabled;
+        addingEnabled = isStaticMode ? false : !!s.addingEnabled;
 
         const toggleVoting = document.getElementById("toggle-voting");
         const toggleAdding = document.getElementById("toggle-adding");
@@ -921,7 +980,9 @@ function setupGlobalTouchHandlers() {
 
     // Handle orientation change
     window.addEventListener("orientationchange", () => {
+        clearMobileFan();
         setTimeout(() => {
+            resetMobileGraphView(document.getElementById("graph-container"), false);
             closeAllTooltips();
         }, 100);
     });
@@ -931,7 +992,19 @@ function setupGlobalTouchHandlers() {
     window.addEventListener("resize", () => {
         clearTimeout(resizeTimeout);
         resizeTimeout = setTimeout(() => {
+            clearMobileFan();
+            resetMobileGraphView(document.getElementById("graph-container"), false);
             closeAllTooltips();
+            if (isOnboardingActive) {
+                ONBOARD_TOOLS.forEach((tool, index) => {
+                    positionOnboardingCard(
+                        document.getElementById(`onboard-card-${index + 1}`),
+                        tool,
+                        index,
+                        onboardingStep === 2 ? 2 : 1,
+                    );
+                });
+            }
         }, 250);
     });
 }
@@ -954,6 +1027,7 @@ function setupModalLogic() {
 
     if (addBtn)
         addBtn.onclick = () => {
+            if (!allowProductionMutation()) return;
             if (!addingEnabled && !isAdmin) {
                 showToast("Adding Closed");
                 return;
@@ -978,6 +1052,10 @@ function setupModalLogic() {
     sliderY.oninput = () => (valY.innerText = sliderY.value);
 
     submitBtn.onclick = () => {
+        if (!allowProductionMutation()) {
+            modal.style.display = "none";
+            return;
+        }
         const name = document.getElementById("new-item-name").value.trim();
         const desc = document.getElementById("new-item-desc").value.trim();
         const x = parseInt(sliderX.value);
@@ -1022,6 +1100,10 @@ function setupEditModalLogic() {
     if (cancelBtn) cancelBtn.onclick = () => (modal.style.display = "none");
     if (submitBtn) {
         submitBtn.onclick = () => {
+            if (!allowProductionMutation()) {
+                modal.style.display = "none";
+                return;
+            }
             const id = document.getElementById("edit-item-id").value;
             const name = document.getElementById("edit-item-name").value.trim();
             const desc = document.getElementById("edit-item-desc").value.trim();
@@ -1058,6 +1140,10 @@ function setupResetModalLogic() {
     if (btnCancel) btnCancel.onclick = () => (modal.style.display = "none");
 
     btnBake.onclick = () => {
+        if (!allowProductionMutation()) {
+            modal.style.display = "none";
+            return;
+        }
         const id = document.getElementById("reset-item-id").value;
         const dot = document.getElementById(`dot-${id}`);
         if (id && dot) {
@@ -1074,6 +1160,10 @@ function setupResetModalLogic() {
     };
 
     btnClear.onclick = () => {
+        if (!allowProductionMutation()) {
+            modal.style.display = "none";
+            return;
+        }
         const id = document.getElementById("reset-item-id").value;
         if (id) {
             remove(ref(db, "votes/" + id));
@@ -1096,6 +1186,7 @@ function setupGlobalResetLogic() {
     const btnMigrate = document.getElementById("btn-migrate-tags");
     if (btnMigrate) {
         btnMigrate.onclick = () => {
+            if (!allowProductionMutation()) return;
             if (confirm("Apply default tags to all existing items? This won't delete any labels or votes, just adds missing branch tags.")) {
                 const updates = {};
                 Object.values(itemsCache).forEach(item => {
@@ -1118,17 +1209,26 @@ function setupGlobalResetLogic() {
 
     if (toggleVoting) {
         toggleVoting.onchange = () => {
+            if (!allowProductionMutation()) {
+                toggleVoting.checked = votingEnabled;
+                return;
+            }
             update(ref(db, "settings"), { votingEnabled: toggleVoting.checked });
         };
     }
     if (toggleAdding) {
         toggleAdding.onchange = () => {
+            if (!allowProductionMutation()) {
+                toggleAdding.checked = addingEnabled;
+                return;
+            }
             update(ref(db, "settings"), { addingEnabled: toggleAdding.checked });
         };
     }
 
     // 1. FACTORY RESET (Nuke)
     btnNuke.onclick = () => {
+        if (!allowProductionMutation()) return;
         if (
             confirm(
                 "FINAL WARNING: This will delete ALL user created tools and revert to the original 19 items.",
@@ -1148,6 +1248,7 @@ function setupGlobalResetLogic() {
 
     // 2. CLEAR VOTES (Keep Items)
     btnClearVotes.onclick = () => {
+        if (!allowProductionMutation()) return;
         if (
             confirm(
                 "Clear all votes? Items will snap back to their default positions.",
@@ -1160,6 +1261,7 @@ function setupGlobalResetLogic() {
 
     // 3. BAKE CONSENSUS
     btnBake.onclick = () => {
+        if (!allowProductionMutation()) return;
         if (
             confirm(
                 "Update all item defaults to their current positions and clear votes?",
@@ -1196,38 +1298,79 @@ function setupVoteConfirmModal() {
     const nameSection = document.getElementById("confirm-vote-username-section");
 
     cancelBtn.onclick = () => {
+        const pendingItemId = pendingVoteConfirmation?.itemId;
         isConfirmingVote = false;
+        pendingVoteConfirmation = null;
         modal.style.display = "none";
-        if (modal.dataset.itemId && currentUser) {
-            remove(ref(db, "votes/" + modal.dataset.itemId + "/" + currentUser.uid));
+        delete modal.dataset.itemId;
+
+        // Dragging is only a local preview. Re-rendering the last confirmed
+        // data removes a new vote's blue marker/connector, or restores an
+        // existing vote to its prior position, without touching Firebase.
+        if (pendingItemId) {
+            updateGraphFromData(
+                previousData,
+                document.getElementById("graph-container"),
+            );
         }
     };
 
     submitBtn.onclick = async () => {
-        // If name input is visible, validate and save it
-        if (nameSection.style.display !== "none") {
-            const val = nameInput.value.trim();
-            if (!val) return alert("Please enter a username.");
-
-            userDisplayName = val;
-            hasConfirmedName = true;
-            localStorage.setItem("voter_name", userDisplayName);
-            localStorage.setItem("voter_name_confirmed", "true");
-            updateUsernameUI();
-
-            // Update the vote we just cast with the new name
-            if (modal.dataset.itemId && currentUser) {
-                update(
-                    ref(db, "votes/" + modal.dataset.itemId + "/" + currentUser.uid),
-                    {
-                        username: userDisplayName,
-                    },
-                );
+        submitBtn.disabled = true;
+        cancelBtn.disabled = true;
+        try {
+            const pending = pendingVoteConfirmation;
+            if (!pending || pending.itemId !== modal.dataset.itemId) {
+                throw new Error("No vote is awaiting confirmation.");
             }
-        }
 
-        isConfirmingVote = false;
-        modal.style.display = "none";
+            let confirmedName = userDisplayName;
+
+            // If name input is visible, validate it before saving anything.
+            if (nameSection.style.display !== "none") {
+                const val = nameInput.value.trim();
+                if (!val) {
+                    alert("Please enter a username.");
+                    return;
+                }
+                confirmedName = val;
+            }
+
+            // This is the first persistence call for the drag. Until the user
+            // presses Vote, the proposed position exists only in the DOM.
+            await saveVote(pending.itemId, {
+                ...pending.vote,
+                username: confirmedName,
+            });
+
+            if (nameSection.style.display !== "none") {
+                userDisplayName = confirmedName;
+                hasConfirmedName = true;
+                localStorage.setItem("voter_name", userDisplayName);
+                localStorage.setItem("voter_name_confirmed", "true");
+                updateUsernameUI();
+            }
+
+            isConfirmingVote = false;
+            pendingVoteConfirmation = null;
+            modal.style.display = "none";
+            delete modal.dataset.itemId;
+            updateGraphFromData(
+                previousData,
+                document.getElementById("graph-container"),
+            );
+            showToast(
+                isLocalPreviewMode
+                    ? "✓ Preview updated — not published"
+                    : "✓ Vote recorded",
+            );
+        } catch (error) {
+            console.error("Could not confirm vote", error);
+            showToast("Couldn’t confirm vote — try again");
+        } finally {
+            submitBtn.disabled = false;
+            cancelBtn.disabled = false;
+        }
     };
 }
 
@@ -1245,8 +1388,14 @@ function createItemElements(container, item) {
 
     const label = document.createElement("div");
     label.className = "dot-label";
-    label.innerText = item.name;
     label.id = `label-${item.id}`;
+    const labelName = document.createElement("span");
+    labelName.className = "dot-label-name";
+    labelName.textContent = item.name;
+    const labelValues = document.createElement("span");
+    labelValues.className = "dot-label-values";
+    labelValues.textContent = formatSpectrumPosition(item.x, item.y);
+    label.append(labelName, labelValues);
     updateLabelPosition(label, item.y);
     avgDot.appendChild(label);
 
@@ -1262,9 +1411,9 @@ function createItemElements(container, item) {
         </div>
         <div id="desc-${item.id}" style="font-size:var(--fs-xs); color:#aaa; line-height:1.2; margin-bottom:4px;">${escapeHtml(item.desc)}</div>
         <div style="font-size:var(--fs-xs); color:#888;">
-            <span style="color:#eee;">Generative: <b id="val-x-${item.id}">${Math.round(item.x)}</b>%</span>
+            <span id="val-x-${item.id}" style="color:#eee;">${formatAxisPosition(item.x, "Utility", "Generative")}</span>
             <span style="margin:0 4px; color:#444;">|</span>
-            <span style="color:#eee;">Readiness: <b id="val-y-${item.id}">${Math.round(item.y)}</b>%</span>
+            <span id="val-y-${item.id}" style="color:#eee;">${formatAxisPosition(item.y, "Not Ready", "Ready")}</span>
             <span id="my-vote-${item.id}" style="margin-left:6px; color:#3b82f6; display:none;"></span>
         </div>
     `;
@@ -1367,6 +1516,10 @@ function highlightItem(id) {
     // Highlight the panel row
     const row = document.getElementById(`panel-row-${id}`);
     if (row) row.classList.add("row-active");
+
+    if (isMobileGraphExperience()) {
+        scheduleMobileLabelClamp(document.getElementById("graph-container"));
+    }
 }
 
 function clearHighlight() {
@@ -1383,8 +1536,742 @@ function clearHighlight() {
     }
 }
 
+function mobileGraphPlotBounds(container) {
+    const availableHeight = Math.max(1, container.clientHeight);
+    const top = Math.min(MOBILE_PLOT_TOP_INSET, availableHeight * 0.25);
+    const requestedBottom = isTimelineOpen
+        ? MOBILE_TIMELINE_PLOT_BOTTOM_INSET
+        : MOBILE_PLOT_BOTTOM_INSET;
+    const bottom = Math.min(requestedBottom, availableHeight * 0.35);
+    return {
+        top,
+        bottom,
+        height: Math.max(1, availableHeight - top - bottom),
+    };
+}
+
+function baseGraphPoint(x, y, container) {
+    let graphY;
+    if (viewMode === "1D") {
+        graphY = container.clientHeight / 2;
+    } else if (isMobileGraphExperience()) {
+        const bounds = mobileGraphPlotBounds(container);
+        graphY =
+            bounds.top +
+            (1 - plotPct(y) / 100) * bounds.height;
+    } else {
+        graphY = (1 - plotPct(y) / 100) * container.clientHeight;
+    }
+    return {
+        x: (plotPct(x) / 100) * container.clientWidth,
+        y: graphY,
+    };
+}
+
+function projectedMobileGraphPoint(x, y, container) {
+    const base = baseGraphPoint(x, y, container);
+    if (!isMobileGraphExperience()) return base;
+    return {
+        x: base.x * mobileGraphView.scale + mobileGraphView.offsetX,
+        y: base.y * mobileGraphView.scale + mobileGraphView.offsetY,
+    };
+}
+
+function clampMobileGraphView(container) {
+    const overscrollX = container.clientWidth * 0.45;
+    const overscrollY = container.clientHeight * 0.45;
+    const minX = container.clientWidth * (1 - mobileGraphView.scale) - overscrollX;
+    const minY = container.clientHeight * (1 - mobileGraphView.scale) - overscrollY;
+    mobileGraphView.offsetX = Math.min(
+        overscrollX,
+        Math.max(minX, mobileGraphView.offsetX),
+    );
+    mobileGraphView.offsetY = Math.min(
+        overscrollY,
+        Math.max(minY, mobileGraphView.offsetY),
+    );
+    if (mobileGraphView.scale <= MOBILE_MIN_ZOOM + 0.001) {
+        mobileGraphView.scale = MOBILE_MIN_ZOOM;
+        mobileGraphView.offsetX = 0;
+        mobileGraphView.offsetY = 0;
+    }
+}
+
+function positionElementForCurrentView(element, x, y, container) {
+    if (isMobileGraphExperience() && container?.clientWidth && container?.clientHeight) {
+        const point = projectedMobileGraphPoint(x, y, container);
+        element.style.left = `${point.x}px`;
+        element.style.bottom = `${container.clientHeight - point.y}px`;
+    } else {
+        element.style.left = plotPct(x) + "%";
+        element.style.bottom = plotPct(y) + "%";
+    }
+}
+
+function applyMobileGraphView(container, { animate = false } = {}) {
+    if (!container) return;
+    clampMobileGraphView(container);
+    container.classList.toggle(
+        "mobile-graph-zoomed",
+        mobileGraphView.scale > MOBILE_MIN_ZOOM + 0.01,
+    );
+    if (animate) {
+        container.classList.add("mobile-view-animating");
+        clearTimeout(mobileViewAnimationTimer);
+        mobileViewAnimationTimer = setTimeout(() => {
+            container.classList.remove("mobile-view-animating");
+            scheduleMobileLabelClamp(container);
+        }, 360);
+    }
+
+    container
+        .querySelectorAll(".dot, .user-dot, .voter-dot")
+        .forEach((element) => {
+            const x = parseFloat(element.dataset.realX);
+            const y = parseFloat(element.dataset.realY);
+            if (Number.isFinite(x) && Number.isFinite(y)) {
+                positionElementForCurrentView(element, x, y, container);
+            }
+        });
+
+    container.querySelectorAll(".connection-line").forEach((line) => {
+        const x1 = parseFloat(line.dataset.realX1);
+        const y1 = parseFloat(line.dataset.realY1);
+        const x2 = parseFloat(line.dataset.realX2);
+        const y2 = parseFloat(line.dataset.realY2);
+        if ([x1, y1, x2, y2].every(Number.isFinite)) {
+            updateConnectionLine(line.dataset.itemId, x1, y1, x2, y2);
+        }
+    });
+
+    const readout = container.querySelector(".mobile-zoom-readout");
+    if (readout) {
+        readout.textContent =
+            mobileGraphView.scale === 1
+                ? "1×"
+                : `${mobileGraphView.scale.toFixed(1).replace(".0", "")}×`;
+    }
+    if (mobileFanItemIds.length) layoutMobileFan(container);
+    else scheduleMobileLabelClamp(container);
+}
+
+function setMobileGraphZoom(container, nextScale, focalX, focalY, animate = false) {
+    const scale = Math.max(MOBILE_MIN_ZOOM, Math.min(MOBILE_MAX_ZOOM, nextScale));
+    const focusX = Number.isFinite(focalX) ? focalX : container.clientWidth / 2;
+    const focusY = Number.isFinite(focalY) ? focalY : container.clientHeight / 2;
+    const contentX = (focusX - mobileGraphView.offsetX) / mobileGraphView.scale;
+    const contentY = (focusY - mobileGraphView.offsetY) / mobileGraphView.scale;
+    mobileGraphView.scale = scale;
+    mobileGraphView.offsetX = focusX - contentX * scale;
+    mobileGraphView.offsetY = focusY - contentY * scale;
+    applyMobileGraphView(container, { animate });
+}
+
+function resetMobileGraphView(container, animate = true) {
+    clearMobileFan();
+    mobileFocusedClusterIds = [];
+    mobileGraphReturnView = null;
+    mobileGraphView.scale = 1;
+    mobileGraphView.offsetX = 0;
+    mobileGraphView.offsetY = 0;
+    applyMobileGraphView(container, { animate });
+}
+
+function rememberMobileGraphView() {
+    // Keep the first viewport in an automatic focus session. Reopening the fan
+    // or selecting one of its points should still return to the original view.
+    if (mobileGraphReturnView) return;
+    mobileGraphReturnView = { ...mobileGraphView };
+}
+
+function restoreMobileGraphView(container, animate = true) {
+    if (!mobileGraphReturnView) return false;
+    const returnView = mobileGraphReturnView;
+    mobileGraphReturnView = null;
+    clearMobileFan();
+    mobileFocusedClusterIds = [];
+    mobileGraphView.scale = returnView.scale;
+    mobileGraphView.offsetX = returnView.offsetX;
+    mobileGraphView.offsetY = returnView.offsetY;
+    applyMobileGraphView(container, { animate });
+    return true;
+}
+
+function focusMobileGraphOnCluster(ids, container, minimumScale = 2.2) {
+    const points = ids
+        .map((id) => {
+            const dot = document.getElementById(`dot-${id}`);
+            if (!dot) return null;
+            return baseGraphPoint(
+                parseFloat(dot.dataset.realX),
+                parseFloat(dot.dataset.realY),
+                container,
+            );
+        })
+        .filter(Boolean);
+    if (!points.length) return;
+    const centerX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
+    const centerY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
+    mobileGraphView.scale = Math.max(mobileGraphView.scale, minimumScale);
+    mobileGraphView.offsetX = container.clientWidth / 2 - centerX * mobileGraphView.scale;
+    mobileGraphView.offsetY = container.clientHeight / 2 - centerY * mobileGraphView.scale;
+    applyMobileGraphView(container, { animate: true });
+}
+
+function mobileTruePoint(id, container) {
+    const dot = document.getElementById(`dot-${id}`);
+    if (!dot || !container) return null;
+    const realX = parseFloat(dot.dataset.realX);
+    const realY = parseFloat(dot.dataset.realY);
+    if (!Number.isFinite(realX) || !Number.isFinite(realY)) return null;
+    return projectedMobileGraphPoint(realX, realY, container);
+}
+
+function mobileDisplayedPoint(id, container) {
+    const dot = document.getElementById(`dot-${id}`);
+    if (!dot || !container) return null;
+    const rect = dot.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    return {
+        x: rect.left + rect.width / 2 - containerRect.left,
+        y: rect.top + rect.height / 2 - containerRect.top,
+    };
+}
+
+function nearestMobileItem(clientX, clientY, container, ids, maxDistance = 52) {
+    const containerRect = container.getBoundingClientRect();
+    const x = clientX - containerRect.left;
+    const y = clientY - containerRect.top;
+    let nearest = null;
+    let nearestDistance = maxDistance;
+
+    ids.forEach((id) => {
+        const dot = document.getElementById(`dot-${id}`);
+        if (!dot || dot.classList.contains("onboarding-hidden")) return;
+        const point = mobileDisplayedPoint(id, container);
+        if (!point) return;
+        const distance = Math.hypot(point.x - x, point.y - y);
+        if (distance < nearestDistance) {
+            nearest = id;
+            nearestDistance = distance;
+        }
+    });
+    return nearest;
+}
+
+function mobileCollisionCluster(seedId, container) {
+    const ids = [...renderedItems];
+    const points = new Map(
+        ids.map((id) => [id, mobileTruePoint(id, container)]),
+    );
+    const cluster = new Set([seedId]);
+    const queue = [seedId];
+
+    while (queue.length) {
+        const currentId = queue.shift();
+        const current = points.get(currentId);
+        if (!current) continue;
+        ids.forEach((candidateId) => {
+            if (cluster.has(candidateId)) return;
+            const candidate = points.get(candidateId);
+            if (
+                candidate &&
+                Math.hypot(current.x - candidate.x, current.y - candidate.y) <=
+                    MOBILE_FAN_THRESHOLD
+            ) {
+                cluster.add(candidateId);
+                queue.push(candidateId);
+            }
+        });
+    }
+
+    return [...cluster].sort((a, b) =>
+        (itemsCache[a]?.name || "").localeCompare(itemsCache[b]?.name || ""),
+    );
+}
+
+function removeMobileFanGraphics() {
+    if (!svgLayer) return;
+    svgLayer
+        .querySelectorAll(".mobile-fan-connector, .mobile-fan-origin")
+        .forEach((element) => element.remove());
+}
+
+function layoutMobileFan(container) {
+    if (!container || !mobileFanItemIds.length || !isMobileGraphExperience()) {
+        return;
+    }
+
+    removeMobileFanGraphics();
+    const points = mobileFanItemIds
+        .map((id) => ({ id, point: mobileTruePoint(id, container) }))
+        .filter(({ point }) => point);
+    if (!points.length) return;
+
+    container.classList.add("mobile-cluster-focus");
+    let focusLabel = container.querySelector(".mobile-cluster-focus-label");
+    if (!focusLabel) {
+        focusLabel = document.createElement("div");
+        focusLabel.className = "mobile-cluster-focus-label";
+        container.appendChild(focusLabel);
+    }
+    focusLabel.textContent = `Zoomed cluster · ${points.length} tools`;
+
+    // The zoom supplies most of the separation. A short, bounded repulsion pass
+    // moves only points that still collide, avoiding the old full-graph jump.
+    const center = {
+        x: points.reduce((sum, entry) => sum + entry.point.x, 0) / points.length,
+        y: points.reduce((sum, entry) => sum + entry.point.y, 0) / points.length,
+    };
+    const targets = points.map(({ id, point }, index) => {
+        const angle = -Math.PI / 2 + (index / points.length) * Math.PI * 2;
+        return {
+            id,
+            origin: point,
+            x: point.x + Math.cos(angle) * 2,
+            y: point.y + Math.sin(angle) * 2,
+        };
+    });
+    const minimumGap = 58;
+    for (let pass = 0; pass < 14; pass++) {
+        for (let i = 0; i < targets.length; i++) {
+            for (let j = i + 1; j < targets.length; j++) {
+                const a = targets[i];
+                const b = targets[j];
+                let dx = b.x - a.x;
+                let dy = b.y - a.y;
+                let distance = Math.hypot(dx, dy);
+                if (distance < 0.01) {
+                    const angle = ((i + j + 1) / targets.length) * Math.PI * 2;
+                    dx = Math.cos(angle);
+                    dy = Math.sin(angle);
+                    distance = 1;
+                }
+                if (distance >= minimumGap) continue;
+                const push = (minimumGap - distance) * 0.36;
+                const nx = dx / distance;
+                const ny = dy / distance;
+                a.x -= nx * push;
+                a.y -= ny * push;
+                b.x += nx * push;
+                b.y += ny * push;
+            }
+        }
+        targets.forEach((target) => {
+            target.x += (target.origin.x - target.x) * 0.08;
+            target.y += (target.origin.y - target.y) * 0.08;
+        });
+    }
+    targets.forEach((target) => {
+        const dx = target.x - target.origin.x;
+        const dy = target.y - target.origin.y;
+        const distance = Math.hypot(dx, dy);
+        const maxShift = 38;
+        if (distance > maxShift) {
+            target.x = target.origin.x + (dx / distance) * maxShift;
+            target.y = target.origin.y + (dy / distance) * maxShift;
+        }
+        target.x = Math.max(34, Math.min(container.clientWidth - 34, target.x));
+        target.y = Math.max(76, Math.min(container.clientHeight - 58, target.y));
+    });
+
+    targets.forEach(({ id, origin: point, x: targetX, y: targetY }) => {
+        const dot = document.getElementById(`dot-${id}`);
+        if (!dot) return;
+        const wasFanned = dot.classList.contains("mobile-fanned");
+        dot.classList.remove(
+            "mobile-fan-collapsing",
+            "mobile-label-left",
+            "mobile-label-right",
+            "mobile-label-below",
+        );
+        dot.classList.add("mobile-fanned");
+        const outwardX = targetX - center.x;
+        const outwardY = targetY - center.y;
+        if (Math.abs(outwardX) > Math.abs(outwardY) * 0.55) {
+            dot.classList.add(outwardX < 0 ? "mobile-label-left" : "mobile-label-right");
+        } else if (outwardY > 0) {
+            dot.classList.add("mobile-label-below");
+        }
+        const fanX = `${targetX - point.x}px`;
+        const fanY = `${targetY - point.y}px`;
+        if (wasFanned) {
+            dot.style.setProperty("--mobile-fan-x", fanX);
+            dot.style.setProperty("--mobile-fan-y", fanY);
+        } else {
+            dot.style.setProperty("--mobile-fan-x", "0px");
+            dot.style.setProperty("--mobile-fan-y", "0px");
+            requestAnimationFrame(() => {
+                if (!mobileFanItemIds.includes(id)) return;
+                dot.style.setProperty("--mobile-fan-x", fanX);
+                dot.style.setProperty("--mobile-fan-y", fanY);
+            });
+        }
+
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("class", "mobile-fan-connector");
+        line.setAttribute("x1", (point.x / container.clientWidth) * 100);
+        line.setAttribute("y1", (point.y / container.clientHeight) * 100);
+        line.setAttribute("x2", (targetX / container.clientWidth) * 100);
+        line.setAttribute("y2", (targetY / container.clientHeight) * 100);
+        svgLayer.appendChild(line);
+
+        const origin = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
+        origin.setAttribute("class", "mobile-fan-origin");
+        origin.setAttribute("cx", (point.x / container.clientWidth) * 100);
+        origin.setAttribute("cy", (point.y / container.clientHeight) * 100);
+        origin.setAttribute("rx", (7 / container.clientWidth) * 100);
+        origin.setAttribute("ry", (7 / container.clientHeight) * 100);
+        svgLayer.appendChild(origin);
+    });
+
+    scheduleMobileLabelClamp(container);
+}
+
+function clearMobileFan() {
+    if (!mobileFanItemIds.length) return;
+    const collapsingIds = [...mobileFanItemIds];
+    mobileFanItemIds = [];
+    removeMobileFanGraphics();
+    const container = document.getElementById("graph-container");
+    if (container) {
+        container.classList.remove("mobile-cluster-focus");
+        container.querySelector(".mobile-cluster-focus-label")?.remove();
+    }
+    collapsingIds.forEach((id) => {
+        const dot = document.getElementById(`dot-${id}`);
+        if (!dot) return;
+        dot.classList.add("mobile-fan-collapsing");
+        dot.style.setProperty("--mobile-fan-x", "0px");
+        dot.style.setProperty("--mobile-fan-y", "0px");
+        setTimeout(() => {
+            if (mobileFanItemIds.includes(id)) return;
+            dot.classList.remove(
+                "mobile-fanned",
+                "mobile-fan-collapsing",
+                "mobile-label-left",
+                "mobile-label-right",
+                "mobile-label-below",
+            );
+            dot.style.removeProperty("--mobile-fan-x");
+            dot.style.removeProperty("--mobile-fan-y");
+            dot.style.removeProperty("--mobile-label-x");
+            dot.style.removeProperty("--mobile-label-y");
+        }, 360);
+    });
+}
+
+function expandMobileFan(ids, container) {
+    rememberMobileGraphView();
+    clearMobileFan();
+    clearHighlight();
+    focusMobileGraphOnCluster(ids, container);
+    mobileFocusedClusterIds = [...ids];
+    mobileFanItemIds = ids;
+    layoutMobileFan(container);
+    showToast(`${ids.length} tools here — choose one`);
+}
+
+function selectMobileItem(id) {
+    clearMobileFan();
+    const container = document.getElementById("graph-container");
+    if (container && isMobileGraphExperience()) {
+        rememberMobileGraphView();
+        // A lone point should get the same spatial focus as a cluster, just at a
+        // gentler zoom so its surrounding context remains visible. Selecting a
+        // point from an already-zoomed fan preserves the stronger cluster zoom.
+        focusMobileGraphOnCluster([id], container, 1.65);
+    }
+    highlightItem(id);
+    const row = document.getElementById(`panel-row-${id}`);
+    if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function scheduleMobileLabelClamp(container) {
+    if (!container || !isMobileGraphExperience()) return;
+    if (mobileLabelClampFrame) cancelAnimationFrame(mobileLabelClampFrame);
+    mobileLabelClampFrame = requestAnimationFrame(() => {
+        const containerRect = container.getBoundingClientRect();
+        const labels = container.querySelectorAll(
+            ".dot.mobile-fanned .dot-label, .dot.highlighted .dot-label",
+        );
+        labels.forEach((label) => {
+            label.style.setProperty("--mobile-label-x", "0px");
+            label.style.setProperty("--mobile-label-y", "0px");
+        });
+        // getBoundingClientRect forces layout after the zeroed offsets, letting
+        // us apply the bounded values before this animation frame is painted.
+        // A nested frame here caused the label to flash unclamped during drag.
+        labels.forEach((label) => {
+            const rect = label.getBoundingClientRect();
+            const padding = 8;
+            const topPadding = mobileGraphView.scale > 1.01 ? 48 : padding;
+            let x = 0;
+            let y = 0;
+            if (rect.left < containerRect.left + padding) {
+                x += containerRect.left + padding - rect.left;
+            }
+            if (rect.right > containerRect.right - padding) {
+                x -= rect.right - (containerRect.right - padding);
+            }
+            if (rect.top < containerRect.top + topPadding) {
+                y += containerRect.top + topPadding - rect.top;
+            }
+            if (rect.bottom > containerRect.bottom - padding) {
+                y -= rect.bottom - (containerRect.bottom - padding);
+            }
+            label.style.setProperty("--mobile-label-x", `${x}px`);
+            label.style.setProperty("--mobile-label-y", `${y}px`);
+        });
+    });
+}
+
+function setupMobileGraphInteractions(container) {
+    const zoomControls = document.createElement("div");
+    zoomControls.className = "mobile-zoom-controls";
+    zoomControls.setAttribute("aria-label", "Graph zoom controls");
+    const zoomOut = document.createElement("button");
+    zoomOut.type = "button";
+    zoomOut.className = "mobile-zoom-out";
+    zoomOut.setAttribute("aria-label", "Zoom out");
+    zoomOut.textContent = "−";
+    const zoomReadout = document.createElement("button");
+    zoomReadout.type = "button";
+    zoomReadout.className = "mobile-zoom-readout";
+    zoomReadout.setAttribute("aria-label", "Reset graph zoom");
+    zoomReadout.textContent = "1×";
+    const zoomIn = document.createElement("button");
+    zoomIn.type = "button";
+    zoomIn.className = "mobile-zoom-in";
+    zoomIn.setAttribute("aria-label", "Zoom in");
+    zoomIn.textContent = "+";
+    zoomControls.append(zoomOut, zoomReadout, zoomIn);
+    container.appendChild(zoomControls);
+
+    zoomOut.onclick = (event) => {
+        event.stopPropagation();
+        clearMobileFan();
+        setMobileGraphZoom(
+            container,
+            mobileGraphView.scale / 1.4,
+            container.clientWidth / 2,
+            container.clientHeight / 2,
+            true,
+        );
+    };
+    zoomIn.onclick = (event) => {
+        event.stopPropagation();
+        clearMobileFan();
+        setMobileGraphZoom(
+            container,
+            mobileGraphView.scale * 1.4,
+            container.clientWidth / 2,
+            container.clientHeight / 2,
+            true,
+        );
+    };
+    zoomReadout.onclick = (event) => {
+        event.stopPropagation();
+        resetMobileGraphView(container, true);
+    };
+
+    const isInteractiveChrome = (target) =>
+        target instanceof Element &&
+        target.closest(
+            "#top-right-controls, .mobile-zoom-controls, .tooltip, .onboarding-overlay, button, input, a",
+        );
+
+    const localTouch = (touch) => {
+        const rect = container.getBoundingClientRect();
+        return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+    };
+
+    const beginPinch = (event) => {
+        clearMobileFan();
+        const a = localTouch(event.touches[0]);
+        const b = localTouch(event.touches[1]);
+        const midpoint = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        mobileViewportGesture = {
+            type: "pinch",
+            startDistance: Math.hypot(b.x - a.x, b.y - a.y),
+            startScale: mobileGraphView.scale,
+            contentX: (midpoint.x - mobileGraphView.offsetX) / mobileGraphView.scale,
+            contentY: (midpoint.y - mobileGraphView.offsetY) / mobileGraphView.scale,
+        };
+        mobileGraphTapStart = null;
+        container.classList.add("mobile-view-manipulating");
+    };
+
+    container.addEventListener(
+        "touchstart",
+        (event) => {
+            if (!isMobileGraphExperience() || isInteractiveChrome(event.target)) {
+                mobileGraphTapStart = null;
+                return;
+            }
+            if (event.touches.length === 2) {
+                beginPinch(event);
+                return;
+            }
+            if (event.touches.length !== 1) {
+                mobileGraphTapStart = null;
+                return;
+            }
+            const touch = event.touches[0];
+            mobileGraphTapStart = {
+                x: touch.clientX,
+                y: touch.clientY,
+                time: Date.now(),
+                canPan:
+                    mobileGraphView.scale > 1.01 &&
+                    !(event.target instanceof Element &&
+                        event.target.closest(".dot, .user-dot")),
+            };
+        },
+        { passive: true },
+    );
+
+    container.addEventListener(
+        "touchmove",
+        (event) => {
+            if (!isMobileGraphExperience()) return;
+            if (event.touches.length === 2) {
+                if (mobileViewportGesture?.type !== "pinch") beginPinch(event);
+                const a = localTouch(event.touches[0]);
+                const b = localTouch(event.touches[1]);
+                const midpoint = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+                const distance = Math.hypot(b.x - a.x, b.y - a.y);
+                mobileGraphView.scale = Math.max(
+                    MOBILE_MIN_ZOOM,
+                    Math.min(
+                        MOBILE_MAX_ZOOM,
+                        mobileViewportGesture.startScale *
+                            (distance / Math.max(1, mobileViewportGesture.startDistance)),
+                    ),
+                );
+                mobileGraphView.offsetX =
+                    midpoint.x - mobileViewportGesture.contentX * mobileGraphView.scale;
+                mobileGraphView.offsetY =
+                    midpoint.y - mobileViewportGesture.contentY * mobileGraphView.scale;
+                applyMobileGraphView(container);
+                event.preventDefault();
+                return;
+            }
+
+            if (
+                event.touches.length === 1 &&
+                (mobileGraphTapStart?.canPan || mobileViewportGesture?.type === "pan")
+            ) {
+                const touch = event.touches[0];
+                const movement = mobileGraphTapStart
+                    ? Math.hypot(
+                        touch.clientX - mobileGraphTapStart.x,
+                        touch.clientY - mobileGraphTapStart.y,
+                    )
+                    : 0;
+                if (movement > 7 && mobileViewportGesture?.type !== "pan") {
+                    clearMobileFan();
+                    mobileViewportGesture = {
+                        type: "pan",
+                        lastX: touch.clientX,
+                        lastY: touch.clientY,
+                    };
+                    mobileGraphTapStart = null;
+                    container.classList.add("mobile-view-manipulating");
+                }
+                if (mobileViewportGesture?.type === "pan") {
+                    mobileGraphView.offsetX += touch.clientX - mobileViewportGesture.lastX;
+                    mobileGraphView.offsetY += touch.clientY - mobileViewportGesture.lastY;
+                    mobileViewportGesture.lastX = touch.clientX;
+                    mobileViewportGesture.lastY = touch.clientY;
+                    applyMobileGraphView(container);
+                    event.preventDefault();
+                }
+            }
+        },
+        { passive: false },
+    );
+
+    container.addEventListener(
+        "touchend",
+        (event) => {
+            if (mobileViewportGesture) {
+                mobileGraphTapStart = null;
+                if (event.touches.length === 0) {
+                    mobileViewportGesture = null;
+                    container.classList.remove("mobile-view-manipulating");
+                    scheduleMobileLabelClamp(container);
+                } else {
+                    mobileViewportGesture.type = "waiting";
+                }
+                event.preventDefault();
+                return;
+            }
+            const start = mobileGraphTapStart;
+            mobileGraphTapStart = null;
+            if (!start || !isMobileGraphExperience() || isDragging) return;
+            const touch = event.changedTouches[0];
+            if (!touch) return;
+            const movement = Math.hypot(touch.clientX - start.x, touch.clientY - start.y);
+            if (movement > MOBILE_DRAG_THRESHOLD || Date.now() - start.time > 450) return;
+
+            event.preventDefault();
+            if (mobileFanItemIds.length) {
+                const selectedId = nearestMobileItem(
+                    touch.clientX,
+                    touch.clientY,
+                    container,
+                    mobileFanItemIds,
+                    48,
+                );
+                if (selectedId) selectMobileItem(selectedId);
+                else clearMobileFan();
+                return;
+            }
+
+            const nearestId = nearestMobileItem(
+                touch.clientX,
+                touch.clientY,
+                container,
+                [...renderedItems],
+            );
+            if (!nearestId) {
+                const hadHighlight = Boolean(_currentHighlightId);
+                clearHighlight();
+                if (!hadHighlight) restoreMobileGraphView(container, true);
+                return;
+            }
+            const cluster = mobileCollisionCluster(nearestId, container);
+            if (
+                _currentHighlightId === nearestId &&
+                mobileFocusedClusterIds.length > 1 &&
+                mobileFocusedClusterIds.includes(nearestId)
+            ) {
+                expandMobileFan(mobileFocusedClusterIds, container);
+            } else if (cluster.length > 1) {
+                expandMobileFan(cluster, container);
+            } else {
+                mobileFocusedClusterIds = [nearestId];
+                selectMobileItem(nearestId);
+            }
+        },
+        { passive: false },
+    );
+
+    container.addEventListener(
+        "touchcancel",
+        () => {
+            mobileGraphTapStart = null;
+            mobileViewportGesture = null;
+            container.classList.remove("mobile-view-manipulating");
+        },
+        { passive: true },
+    );
+}
+
 // --- FILTER AND REORDER LOGIC ---
 function applyFilters(options = {}) {
+    clearMobileFan();
     const searchInput = document.getElementById("search-input");
     const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
     const container = document.getElementById("graph-container");
@@ -1550,7 +2437,12 @@ function renderToolPanel() {
         });
         row.addEventListener("click", () => {
             // Tap: keep highlight until another is chosen
-            highlightItem(item.id);
+            if (isMobileGraphExperience()) {
+                selectMobileItem(item.id);
+            } else {
+                clearMobileFan();
+                highlightItem(item.id);
+            }
         });
 
         panelInner.appendChild(row);
@@ -1571,6 +2463,7 @@ function setupTapTooltip(avgDot, item) {
     avgDot.addEventListener(
         "touchstart",
         (e) => {
+            if (isMobileGraphExperience()) return;
             tapStartTime = Date.now();
             tapStartX = e.touches[0].clientX;
             tapStartY = e.touches[0].clientY;
@@ -1579,6 +2472,7 @@ function setupTapTooltip(avgDot, item) {
     );
 
     avgDot.addEventListener("touchend", (e) => {
+        if (isMobileGraphExperience()) return;
         const tapDuration = Date.now() - tapStartTime;
         const touch = e.changedTouches[0];
         const moveX = Math.abs(touch.clientX - tapStartX);
@@ -1625,7 +2519,8 @@ function setupTapTooltip(avgDot, item) {
 
 function updateItemMetadata(item) {
     const label = document.getElementById(`label-${item.id}`);
-    if (label) label.innerText = item.name;
+    const labelName = label?.querySelector(".dot-label-name");
+    if (labelName) labelName.textContent = item.name;
     const tooltip = document.getElementById(`tooltip-${item.id}`);
     if (tooltip) {
         const titleStrong = tooltip.querySelector("strong");
@@ -1648,6 +2543,7 @@ function updateItemMetadata(item) {
 }
 
 function removeItemElements(id) {
+    if (mobileFanItemIds.includes(id)) clearMobileFan();
     const dot = document.getElementById(`dot-${id}`);
     const uDot = document.getElementById(`user-dot-${id}`);
     const line = document.getElementById(`line-${id}`);
@@ -1666,38 +2562,6 @@ function removeItemElements(id) {
 }
 
 function setupDrag(avgDot, userDot, item, container) {
-    const updateFirebase = throttle((x, y) => {
-        if (!currentUser || isConfirmingVote) return;
-
-        if (viewMode === "1D") {
-            let targetY = 50;
-            const itemVotes = previousData[item.id] || {};
-            if (itemVotes[currentUser.uid]) {
-                targetY = itemVotes[currentUser.uid].y;
-            } else {
-                const avgDotDom = document.getElementById(`dot-${item.id}`);
-                if (avgDotDom) {
-                    const currentBottom = avgDotDom.dataset.realY;
-                    if (currentBottom != null) targetY = parseFloat(currentBottom);
-                    else targetY = item.y;
-                }
-            }
-            set(ref(db, "votes/" + item.id + "/" + currentUser.uid), {
-                x: Math.round(x * 10) / 10,
-                y: Math.round(targetY * 10) / 10,
-                username: userDisplayName,
-                timestamp: Date.now(),
-            });
-        } else {
-            set(ref(db, "votes/" + item.id + "/" + currentUser.uid), {
-                x: Math.round(x * 10) / 10,
-                y: Math.round(y * 10) / 10,
-                username: userDisplayName,
-                timestamp: Date.now(),
-            });
-        }
-    }, 50);
-
     const startDrag = function (clientX, clientY, targetElement, originalEvent) {
         if (!currentUser || isConfirmingVote) return;
 
@@ -1729,6 +2593,14 @@ function setupDrag(avgDot, userDot, item, container) {
             originalEvent.stopPropagation();
         }
 
+        if (isMobileGraphExperience() && mobileGraphView.scale > 1.01) {
+            // Once the user commits to moving a point, restore the full graph so
+            // the entire voting range is visible. Do this before mapping the
+            // touch so the dragged vote uses stable 1x graph coordinates.
+            resetMobileGraphView(container, true);
+            highlightItem(item.id);
+        }
+
         isDragging = item.id;
         const activeDot = userDot;
         activeDot.style.display = "block";
@@ -1743,7 +2615,13 @@ function setupDrag(avgDot, userDot, item, container) {
         let shiftX = 0,
             shiftY = 0;
 
-        if (targetElement === avgDot) {
+        if (isMobileGraphExperience()) {
+            if (targetElement !== avgDot) {
+                const rect = activeDot.getBoundingClientRect();
+                shiftX = clientX - (rect.left + rect.width / 2);
+                shiftY = clientY - (rect.top + rect.height / 2);
+            }
+        } else if (targetElement === avgDot) {
             shiftX = activeDot.offsetWidth / 2;
             shiftY = activeDot.offsetHeight / 2;
         } else {
@@ -1756,17 +2634,31 @@ function setupDrag(avgDot, userDot, item, container) {
             const containerRect = container.getBoundingClientRect();
             let newX = pageX - shiftX - containerRect.left;
             let newY = pageY - shiftY - containerRect.top;
+            if (isMobileGraphExperience()) {
+                newX = (newX - mobileGraphView.offsetX) / mobileGraphView.scale;
+                newY = (newY - mobileGraphView.offsetY) / mobileGraphView.scale;
+            }
             if (newX < 0) newX = 0;
             if (newX > container.clientWidth) newX = container.clientWidth;
             if (newY < 0) newY = 0;
             if (newY > container.clientHeight) newY = container.clientHeight;
             let pointerX = (newX / container.clientWidth) * 100;
-            let pointerY = 100 - (newY / container.clientHeight) * 100;
+            let pointerY;
+            if (isMobileGraphExperience() && viewMode !== "1D") {
+                const bounds = mobileGraphPlotBounds(container);
+                const boundedY = Math.max(
+                    bounds.top,
+                    Math.min(bounds.top + bounds.height, newY),
+                );
+                pointerY =
+                    100 - ((boundedY - bounds.top) / bounds.height) * 100;
+            } else {
+                pointerY = 100 - (newY / container.clientHeight) * 100;
+            }
             let percentX = Math.max(0, Math.min(100, unplotPct(pointerX)));
             let percentY = Math.max(0, Math.min(100, unplotPct(pointerY)));
 
             updateElementPosition(activeDot, percentX, percentY);
-            updateFirebase(percentX, percentY);
 
             const avgDot = document.getElementById(`dot-${item.id}`);
             if (avgDot) {
@@ -1788,7 +2680,7 @@ function setupDrag(avgDot, userDot, item, container) {
             }
         }
 
-        function endDrag() {
+        async function endDrag() {
             document.removeEventListener("mousemove", onMouseMove);
             document.onmouseup = null;
             document.removeEventListener("touchmove", onTouchMove);
@@ -1804,6 +2696,8 @@ function setupDrag(avgDot, userDot, item, container) {
                 if (activeDot.dataset.tempX) {
                     let x = parseFloat(activeDot.dataset.tempX);
                     let y = parseFloat(activeDot.dataset.tempY);
+                    delete activeDot.dataset.tempX;
+                    delete activeDot.dataset.tempY;
                     if (viewMode === "1D") {
                         let targetY = 50;
                         const itemVotes = previousData[item.id] || {};
@@ -1820,15 +2714,18 @@ function setupDrag(avgDot, userDot, item, container) {
                         y = targetY;
                     }
 
-                    set(ref(db, "votes/" + item.id + "/" + currentUser.uid), {
-                        x: Math.round(x * 10) / 10,
-                        y: Math.round(y * 10) / 10,
-                        username: userDisplayName,
-                        timestamp: Date.now(),
-                    });
+                    isConfirmingVote = true;
+                    pendingVoteConfirmation = {
+                        itemId: item.id,
+                        vote: {
+                            x: Math.round(x * 10) / 10,
+                            y: Math.round(y * 10) / 10,
+                            username: userDisplayName,
+                            timestamp: Date.now(),
+                        },
+                    };
 
                     // --- SHOW CONFIRMATION MODAL ---
-                    isConfirmingVote = true;
                     const modal = document.getElementById("confirm-vote-modal");
                     const title = document.getElementById("confirm-vote-title");
                     const stats = document.getElementById("confirm-vote-stats");
@@ -1843,8 +2740,8 @@ function setupDrag(avgDot, userDot, item, container) {
                     title.innerText = `Vote for ${item.name}`;
                     stats.innerHTML = `
                         <div style="margin-top:10px;">
-                            <strong>Generative:</strong> ${Math.round(x)}%<br>
-                            <strong>Readiness:</strong> ${Math.round(y)}%
+                            <strong>${formatAxisPosition(x, "Utility", "Generative")}</strong><br>
+                            <strong>${formatAxisPosition(y, "Not Ready", "Ready")}</strong>
                         </div>
                     `;
 
@@ -1905,9 +2802,23 @@ function setupDrag(avgDot, userDot, item, container) {
                 const touch = e.touches[0];
                 const moveX = Math.abs(touch.clientX - avgDot._touchStartX);
                 const moveY = Math.abs(touch.clientY - avgDot._touchStartY);
+                const isFannedChoice = mobileFanItemIds.includes(item.id);
+                const dragThreshold = isFannedChoice
+                    ? 8
+                    : isMobileGraphExperience()
+                      ? MOBILE_DRAG_THRESHOLD
+                      : 5;
 
                 // If moved enough, start dragging
-                if (moveX > 5 || moveY > 5) {
+                if (moveX > dragThreshold || moveY > dragThreshold) {
+                    if (
+                        isMobileGraphExperience() &&
+                        _currentHighlightId !== item.id &&
+                        !mobileFanItemIds.includes(item.id)
+                    ) {
+                        avgDot._touchStartTime = null;
+                        return;
+                    }
                     if (!isDragging) {
                         startDrag(touch.clientX, touch.clientY, avgDot, e);
                     }
@@ -1938,9 +2849,12 @@ function setupDrag(avgDot, userDot, item, container) {
                 const touch = e.touches[0];
                 const moveX = Math.abs(touch.clientX - userDot._touchStartX);
                 const moveY = Math.abs(touch.clientY - userDot._touchStartY);
+                const dragThreshold = isMobileGraphExperience()
+                    ? MOBILE_DRAG_THRESHOLD
+                    : 5;
 
                 // If moved enough, start dragging
-                if (moveX > 5 || moveY > 5) {
+                if (moveX > dragThreshold || moveY > dragThreshold) {
                     if (!isDragging) {
                         startDrag(touch.clientX, touch.clientY, userDot, e);
                     }
@@ -2035,24 +2949,31 @@ function updateGraphFromData(allVotes, container) {
             if (!activeVoters.has(uid)) dot.remove();
         });
 
-        let myVote = null;
-        if (currentUser && itemVotes[currentUser.uid]) {
-            myVote = itemVotes[currentUser.uid];
-            // If dragging, we use the local temp position for the average calculation
-            // to provide real-time feedback.
-            if (isDragging === itemId) {
-                const userDot = document.getElementById(`user-dot-${itemId}`);
-                if (userDot && userDot.dataset.tempX) {
-                    const tx = parseFloat(userDot.dataset.tempX);
-                    const ty = parseFloat(userDot.dataset.tempY);
-                    totalX += tx;
-                    totalY += ty;
-                    count++;
-                } else {
-                    totalX += myVote.x;
-                    totalY += myVote.y;
-                    count++;
-                }
+        const myVote = currentUser
+            ? itemVotes[currentUser.uid] || null
+            : null;
+        const userDot = document.getElementById(`user-dot-${itemId}`);
+        let dragPreviewVote = null;
+        if (
+            isDragging === itemId &&
+            userDot?.dataset.tempX != null &&
+            userDot?.dataset.tempY != null
+        ) {
+            dragPreviewVote = {
+                x: parseFloat(userDot.dataset.tempX),
+                y: parseFloat(userDot.dataset.tempY),
+                username: userDisplayName,
+            };
+        }
+
+        // A drag can preview the consensus locally, but it is not part of
+        // itemVotes (and therefore cannot persist) until Vote is pressed.
+        if (isDragging === itemId) {
+            const previewContribution = dragPreviewVote || myVote;
+            if (previewContribution) {
+                totalX += previewContribution.x;
+                totalY += previewContribution.y;
+                count++;
             }
         }
 
@@ -2072,12 +2993,28 @@ function updateGraphFromData(allVotes, container) {
             updateDotColor(avgDot, avgY);
             const label = document.getElementById(`label-${itemId}`);
             if (label) updateLabelPosition(label, avgY);
+            const labelValues = label?.querySelector(".dot-label-values");
+            if (labelValues) {
+                labelValues.textContent = formatSpectrumPosition(avgX, avgY);
+            }
 
             // UPDATE TOOLTIP VALUES
             const valX = document.getElementById(`val-x-${itemId}`);
             const valY = document.getElementById(`val-y-${itemId}`);
-            if (valX) valX.innerText = Math.round(avgX);
-            if (valY) valY.innerText = Math.round(avgY);
+            if (valX) {
+                valX.innerText = formatAxisPosition(
+                    avgX,
+                    "Utility",
+                    "Generative",
+                );
+            }
+            if (valY) {
+                valY.innerText = formatAxisPosition(
+                    avgY,
+                    "Not Ready",
+                    "Ready",
+                );
+            }
 
             // UPDATE PANEL ROW METRICS (bars + numbers)
             const barGen = document.getElementById(`bar-gen-${itemId}`);
@@ -2102,15 +3039,19 @@ function updateGraphFromData(allVotes, container) {
             if (myVoteDiv) {
                 if (myVote) {
                     myVoteDiv.style.display = "inline";
-                    myVoteDiv.innerHTML = `<span style="color:#444">|</span> Me: <b>${Math.round(myVote.x)}/${Math.round(myVote.y)}</b>`;
+                    myVoteDiv.innerHTML = `<span style="color:#444">|</span> Me: <b>${formatSpectrumPosition(myVote.x, myVote.y)}</b>`;
                 } else {
                     myVoteDiv.style.display = "none";
                 }
             }
         }
-        const userDot = document.getElementById(`user-dot-${itemId}`);
+        const pendingVote =
+            pendingVoteConfirmation?.itemId === itemId
+                ? pendingVoteConfirmation.vote
+                : null;
+        const visibleUserVote = pendingVote || dragPreviewVote || myVote;
         if (userDot) {
-            if (myVote) {
+            if (visibleUserVote) {
                 userDot.style.display = "block";
                 // Ensure name is on user dot
                 let nameLabel = userDot.querySelector(".voter-username");
@@ -2119,7 +3060,7 @@ function updateGraphFromData(allVotes, container) {
                     nameLabel.className = "voter-username";
                     userDot.appendChild(nameLabel);
                 }
-                nameLabel.innerText = userDisplayName;
+                nameLabel.innerText = visibleUserVote.username || userDisplayName;
 
                 if (
                     isDragging === itemId ||
@@ -2147,8 +3088,18 @@ function updateGraphFromData(allVotes, container) {
                 }
 
                 if (isDragging !== itemId) {
-                    updateElementPosition(userDot, myVote.x, myVote.y);
-                    updateConnectionLine(itemId, avgX, avgY, myVote.x, myVote.y);
+                    updateElementPosition(
+                        userDot,
+                        visibleUserVote.x,
+                        visibleUserVote.y,
+                    );
+                    updateConnectionLine(
+                        itemId,
+                        avgX,
+                        avgY,
+                        visibleUserVote.x,
+                        visibleUserVote.y,
+                    );
                 } else {
                     const currentDomLeft = parseFloat(userDot.dataset.realX);
                     const currentDomBottom = parseFloat(userDot.dataset.realY);
@@ -2172,16 +3123,35 @@ function updateGraphFromData(allVotes, container) {
 
     // After all dots have moved, schedule label de-overlap pass
     scheduleResolveLabels();
+    if (isMobileGraphExperience()) {
+        if (mobileFanItemIds.length) layoutMobileFan(container);
+        else scheduleMobileLabelClamp(container);
+    }
 }
 
 function updateConnectionLine(itemId, x1, y1, x2, y2) {
     const line = document.getElementById(`line-${itemId}`);
     if (line) {
+        line.dataset.itemId = itemId;
+        line.dataset.realX1 = x1;
+        line.dataset.realY1 = y1;
+        line.dataset.realX2 = x2;
+        line.dataset.realY2 = y2;
         line.style.display = "block";
-        line.setAttribute("x1", plotPct(x1));
-        line.setAttribute("y1", 100 - plotPct(y1));
-        line.setAttribute("x2", plotPct(x2));
-        line.setAttribute("y2", 100 - plotPct(y2));
+        const container = document.getElementById("graph-container");
+        if (isMobileGraphExperience() && container) {
+            const point1 = projectedMobileGraphPoint(x1, y1, container);
+            const point2 = projectedMobileGraphPoint(x2, y2, container);
+            line.setAttribute("x1", (point1.x / container.clientWidth) * 100);
+            line.setAttribute("y1", (point1.y / container.clientHeight) * 100);
+            line.setAttribute("x2", (point2.x / container.clientWidth) * 100);
+            line.setAttribute("y2", (point2.y / container.clientHeight) * 100);
+        } else {
+            line.setAttribute("x1", plotPct(x1));
+            line.setAttribute("y1", 100 - plotPct(y1));
+            line.setAttribute("x2", plotPct(x2));
+            line.setAttribute("y2", 100 - plotPct(y2));
+        }
     }
 }
 
@@ -2189,8 +3159,14 @@ function triggerSplash(container, x, y) {
     if (Date.now() - window.appLaunchTime < 2000) return;
     const splash = document.createElement("div");
     splash.className = "splash";
-    splash.style.left = plotPct(x) + "%";
-    splash.style.bottom = plotPct(y) + "%";
+    if (isMobileGraphExperience()) {
+        const point = projectedMobileGraphPoint(x, y, container);
+        splash.style.left = `${point.x}px`;
+        splash.style.bottom = `${container.clientHeight - point.y}px`;
+    } else {
+        splash.style.left = plotPct(x) + "%";
+        splash.style.bottom = plotPct(y) + "%";
+    }
     container.appendChild(splash);
     setTimeout(() => splash.remove(), 600);
 }
@@ -2199,8 +3175,14 @@ function triggerMegaSplash(container, x, y) {
     if (Date.now() - window.appLaunchTime < 2000) return;
     const splash = document.createElement("div");
     splash.className = "mega-splash";
-    splash.style.left = plotPct(x) + "%";
-    splash.style.bottom = plotPct(y) + "%";
+    if (isMobileGraphExperience()) {
+        const point = projectedMobileGraphPoint(x, y, container);
+        splash.style.left = `${point.x}px`;
+        splash.style.bottom = `${container.clientHeight - point.y}px`;
+    } else {
+        splash.style.left = plotPct(x) + "%";
+        splash.style.bottom = plotPct(y) + "%";
+    }
     container.appendChild(splash);
     setTimeout(() => splash.remove(), 1200);
 }
@@ -2219,8 +3201,12 @@ function unplotPct(p) {
 function updateElementPosition(element, x, y) {
     element.dataset.realX = x;
     element.dataset.realY = y;
-    element.style.left = plotPct(x) + "%";
-    element.style.bottom = plotPct(y) + "%";
+    positionElementForCurrentView(
+        element,
+        x,
+        y,
+        document.getElementById("graph-container"),
+    );
 }
 function updateDotColor(dot, y) {
     dot.classList.remove("ready-high", "ready-mid", "ready-low");
@@ -2405,6 +3391,7 @@ function obbOverlapAmount(a, b) {
 }
 
 window.deleteItem = (id) => {
+    if (!allowProductionMutation()) return;
     if (confirm("Are you sure you want to delete this item?")) {
         remove(ref(db, "items/" + id));
         remove(ref(db, "votes/" + id));
@@ -2412,14 +3399,16 @@ window.deleteItem = (id) => {
 };
 
 window.resetVotes = (id) => {
+    if (!allowProductionMutation()) return;
     const modal = document.getElementById("reset-options-modal");
     document.getElementById("reset-item-id").value = id;
     modal.style.display = "flex";
 };
 
 window.editItem = (id) => {
+    if (!allowProductionMutation()) return;
     const modal = document.getElementById("edit-item-modal");
-    const name = document.getElementById(`label-${id}`).innerText;
+    const name = document.querySelector(`#label-${id} .dot-label-name`)?.innerText || "";
     const desc = document.getElementById(`desc-${id}`).innerText;
     const item = itemsCache[id];
     
@@ -2837,6 +3826,7 @@ async function openTimeline() {
     const container = document.getElementById("graph-container");
     if (btn) btn.classList.add("active");
     if (bar) bar.style.display = "flex";
+    if (container) container.classList.add("timeline-open");
 
     closeAllTooltips();
 
@@ -2863,7 +3853,7 @@ function closeTimeline() {
     const container = document.getElementById("graph-container");
     if (btn) btn.classList.remove("active");
     if (bar) bar.style.display = "none";
-    if (container) container.classList.remove("mode-timeline");
+    if (container) container.classList.remove("mode-timeline", "timeline-open");
 
     jumpToLive();
 }
@@ -2977,6 +3967,23 @@ const ONBOARD_TOOLS = [
     },
 ];
 
+function positionOnboardingCard(card, tool, index, step) {
+    if (!card) return;
+    const usePhoneLayout = isMobileGraphExperience();
+    const mobileX = [17, 50, 83][index];
+    const mobileY = [82, 55, 20][index];
+    const x = usePhoneLayout ? mobileX : tool.x;
+    const y = step === 1 ? (usePhoneLayout ? 42 : 44) : (usePhoneLayout ? mobileY : tool.y);
+
+    card.style.left = `${x}%`;
+    card.style.bottom = `${y}%`;
+    card.classList.remove("card-left", "card-right");
+    if (!usePhoneLayout) {
+        if (x < 15) card.classList.add("card-left");
+        else if (x > 85) card.classList.add("card-right");
+    }
+}
+
 let onboardingTimers = [];
 let isStepAnimating = false;
 
@@ -3004,10 +4011,7 @@ function fastForwardCurrentStep() {
             const card = document.getElementById(`onboard-card-${index + 1}`);
             if (card) {
                 card.className = "onboard-sample-card visible";
-                card.style.left = `${tool.x}%`;
-                card.style.bottom = "44%";
-                if (tool.x < 15) card.classList.add("card-left");
-                else if (tool.x > 85) card.classList.add("card-right");
+                positionOnboardingCard(card, tool, index, 1);
             }
         });
 
@@ -3021,10 +4025,7 @@ function fastForwardCurrentStep() {
             const card = document.getElementById(`onboard-card-${index + 1}`);
             if (card) {
                 card.className = "onboard-sample-card visible";
-                card.style.left = `${tool.x}%`;
-                card.style.bottom = `${tool.y}%`;
-                if (tool.x < 15) card.classList.add("card-left");
-                else if (tool.x > 85) card.classList.add("card-right");
+                positionOnboardingCard(card, tool, index, 2);
             }
         });
 
@@ -3079,6 +4080,7 @@ function startOnboarding(force = false) {
     const panel = document.getElementById("tool-panel-inner");
     const sidebar = document.getElementById("onboard-sidebar-panel");
     if (!overlay || !container) return;
+    document.body.classList.add("onboarding-active");
 
     overlay.style.display = "block";
     overlay.style.opacity = "1";
@@ -3145,10 +4147,7 @@ function renderOnboardingStep1() {
         const card = document.getElementById(`onboard-card-${index + 1}`);
         if (card) {
             card.className = "onboard-sample-card";
-            card.style.left = `${tool.x}%`;
-            card.style.bottom = "44%";
-            if (tool.x < 15) card.classList.add("card-left");
-            else if (tool.x > 85) card.classList.add("card-right");
+            positionOnboardingCard(card, tool, index, 1);
         }
     });
 
@@ -3269,19 +4268,19 @@ function renderOnboardingStep2() {
     // Tool 1: Denoising Sound rises to 94.9% at 1.5s
     addOnboardingTimer(() => {
         const card1 = document.getElementById("onboard-card-1");
-        if (card1) card1.style.bottom = `${ONBOARD_TOOLS[0].y}%`;
+        positionOnboardingCard(card1, ONBOARD_TOOLS[0], 0, 2);
     }, 1500);
 
     // Tool 2: Character In-Betweening glides to 61.3% at 2.2s
     addOnboardingTimer(() => {
         const card2 = document.getElementById("onboard-card-2");
-        if (card2) card2.style.bottom = `${ONBOARD_TOOLS[1].y}%`;
+        positionOnboardingCard(card2, ONBOARD_TOOLS[1], 1, 2);
     }, 2200);
 
     // Tool 3: Idea to Script glides to 10.8% at 2.9s
     addOnboardingTimer(() => {
         const card3 = document.getElementById("onboard-card-3");
-        if (card3) card3.style.bottom = `${ONBOARD_TOOLS[2].y}%`;
+        positionOnboardingCard(card3, ONBOARD_TOOLS[2], 2, 2);
     }, 2900);
 
     // Phase 4 (3.8s): Sidebar card fades up
@@ -3335,6 +4334,7 @@ function completeOnboarding() {
             overlay.style.opacity = "0";
             setTimeout(() => {
                 overlay.style.display = "none";
+                document.body.classList.remove("onboarding-active");
             }, 500);
         }
     }, 400);
@@ -3349,6 +4349,7 @@ function completeOnboarding() {
 
 function skipOnboarding() {
     clearOnboardingTimers();
+    document.body.classList.remove("onboarding-active");
     const overlay = document.getElementById("onboarding-overlay");
     const container = document.getElementById("graph-container");
     const panel = document.getElementById("tool-panel-inner");
@@ -3512,4 +4513,3 @@ document.addEventListener("click", (e) => {
     if (inMenu && !isAction) return;
     header.classList.remove("settings-open");
 });
-

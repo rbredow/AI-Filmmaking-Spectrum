@@ -214,6 +214,12 @@ export function createItemElements(container, item, { onEditItem = null, onReset
         tooltip.style.top = "26px";
     }
 
+    avgDot.addEventListener("mouseenter", () => {
+        document.querySelectorAll(".dot.tooltip-active").forEach((d) => {
+            if (d !== avgDot) d.classList.remove("tooltip-active");
+        });
+    });
+
     avgDot.appendChild(tooltip);
     container.appendChild(avgDot);
 

@@ -1332,10 +1332,12 @@ body.onboarding-active #tool-panel-header {
 }
 
 .dot:hover,
-.dot.force-tooltip {
+.dot.force-tooltip,
+.dot.tooltip-active {
     z-index: 1100;
-    transform: translate(-50%, 50%) scale(1.2);
+    transform: translate(-50%, 50%);
     border-color: #fff;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
 }
 
 .dot.ready-high {
@@ -2946,10 +2948,11 @@ button:active {
         background: transparent;
     }
 
-    /* Add active states instead */
+    /* Add active states without scaling child tooltip */
     .dot:active {
-        transform: translate(-50%, 50%) scale(1.3);
-        z-index: 100;
+        transform: translate(-50%, 50%);
+        border-color: #fff;
+        z-index: 1100;
     }
 
     .user-dot:active {

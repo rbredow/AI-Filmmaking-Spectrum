@@ -45,4 +45,32 @@ describe("graph-renderer splashes and lines", () => {
         expect(line.getAttribute("x1")).not.toBeNull();
         expect(line.getAttribute("y1")).not.toBeNull();
     });
+
+    it("hovering another dot (mouseenter) clears tooltip-active from all other dots to ensure only one popup at a time", async () => {
+        const { createItemElements } = await import("../../src/ui/graph-renderer.js");
+        createItemElements(container, { id: "item_01", name: "Tool A", x: 20, y: 30 });
+        createItemElements(container, { id: "item_02", name: "Tool B", x: 60, y: 70 });
+
+        const dotA = document.getElementById("dot-item_01");
+        const dotB = document.getElementById("dot-item_02");
+
+        dotA.classList.add("tooltip-active");
+        expect(dotA.classList.contains("tooltip-active")).toBe(true);
+
+        // Hover over dot B
+        dotB.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+
+        // Dot A's active tooltip must be dismissed
+        expect(dotA.classList.contains("tooltip-active")).toBe(false);
+    });
+
+    it("verifies style.css does not apply scale() transforms to parent .dot on hover/active to keep tooltip dimensions unified", async () => {
+        const fs = await import("fs");
+        const path = await import("path");
+        const cssContent = fs.readFileSync(path.resolve(__dirname, "../../style.css"), "utf8");
+
+        // .dot:hover and .dot:active must not scale the parent dot, which causes child tooltip size flashing
+        expect(cssContent).not.toMatch(/\.dot:hover[^{]*\{[^}]*scale\(/);
+        expect(cssContent).not.toMatch(/\.dot:active[^{]*\{[^}]*scale\(/);
+    });
 });

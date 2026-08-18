@@ -4,6 +4,7 @@ import { unplotPct, mobileGraphPlotBounds } from "../core/coords.js";
 import { updateElementPosition, updateConnectionLine } from "./graph-renderer.js";
 import { highlightItem } from "./highlight.js";
 import { showToast } from "./toast.js";
+import { showConfirmVoteModal } from "./modals.js";
 import { MOBILE_DRAG_THRESHOLD } from "../config/constants.js";
 
 const isTouchDevice = () =>
@@ -22,7 +23,20 @@ export function closeAllTooltips() {
 }
 
 export function setupDrag(avgDot, userDot, item, container, { resetMobileGraphViewFn = null, showConfirmVoteModalFn = null } = {}) {
-    const startDrag = function (clientX, clientY, targetElement, originalEvent) {
+    function handleDotSelection() {
+        highlightItem(item.id);
+        const row = document.getElementById(`panel-row-${item.id}`);
+        if (row && typeof row.scrollIntoView === "function") {
+            row.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        const isTooltipActive = avgDot.classList.contains("tooltip-active");
+        closeAllTooltips();
+        if (!isTooltipActive) {
+            avgDot.classList.add("tooltip-active");
+        }
+    }
+
+    const startDragInteraction = function (startX, startY, targetElement, originalEvent) {
         if (!state.currentUser || state.isConfirmingVote) return;
 
         if (state.isTimelineOpen && (state.currentTimelineTimestamp < state.timelineMaxTime - 5000)) {
@@ -45,38 +59,42 @@ export function setupDrag(avgDot, userDot, item, container, { resetMobileGraphVi
             return;
         }
 
-        if (originalEvent && originalEvent.preventDefault) originalEvent.preventDefault();
-        if (originalEvent && originalEvent.stopPropagation) originalEvent.stopPropagation();
-
-        if (isMobileGraphExperience() && state.mobileGraphView.scale > 1.01) {
-            if (resetMobileGraphViewFn) resetMobileGraphViewFn(container, true);
-            highlightItem(item.id);
-        }
-
-        setState({ isDragging: item.id });
+        let isDragCommitted = false;
         const activeDot = userDot;
-        activeDot.style.display = "block";
-        activeDot.style.zIndex = "1000";
-        activeDot.classList.add("dragging");
-
-        closeAllTooltips();
 
         let shiftX = 0;
         let shiftY = 0;
 
-        if (isMobileGraphExperience()) {
-            if (targetElement !== avgDot) {
-                const rect = activeDot.getBoundingClientRect();
-                shiftX = clientX - (rect.left + rect.width / 2);
-                shiftY = clientY - (rect.top + rect.height / 2);
+        function commitDrag(clientX, clientY) {
+            isDragCommitted = true;
+            setState({ isDragging: item.id });
+            activeDot.style.display = "block";
+            activeDot.style.zIndex = "1000";
+            activeDot.classList.add("dragging");
+
+            closeAllTooltips();
+
+            if (isMobileGraphExperience() && state.mobileGraphView.scale > 1.01) {
+                if (resetMobileGraphViewFn) resetMobileGraphViewFn(container, true);
+                highlightItem(item.id);
             }
-        } else if (targetElement === avgDot) {
-            shiftX = activeDot.offsetWidth / 2;
-            shiftY = activeDot.offsetHeight / 2;
-        } else {
-            const rect = activeDot.getBoundingClientRect();
-            shiftX = clientX - rect.left;
-            shiftY = clientY - rect.top;
+
+            if (isMobileGraphExperience()) {
+                if (targetElement !== avgDot) {
+                    const rect = activeDot.getBoundingClientRect();
+                    shiftX = clientX - (rect.left + rect.width / 2);
+                    shiftY = clientY - (rect.top + rect.height / 2);
+                }
+            } else if (targetElement === avgDot) {
+                shiftX = activeDot.offsetWidth / 2;
+                shiftY = activeDot.offsetHeight / 2;
+            } else {
+                const rect = activeDot.getBoundingClientRect();
+                shiftX = clientX - rect.left;
+                shiftY = clientY - rect.top;
+            }
+
+            moveAt(clientX, clientY);
         }
 
         function moveAt(pageX, pageY) {
@@ -124,23 +142,39 @@ export function setupDrag(avgDot, userDot, item, container, { resetMobileGraphVi
         }
 
         function onMouseMove(event) {
-            moveAt(event.clientX, event.clientY);
+            const dist = Math.hypot(event.clientX - startX, event.clientY - startY);
+            const threshold = 5;
+
+            if (!isDragCommitted && dist >= threshold) {
+                commitDrag(event.clientX, event.clientY);
+            } else if (isDragCommitted) {
+                moveAt(event.clientX, event.clientY);
+            }
         }
 
         function onTouchMove(event) {
             if (event.touches.length > 0) {
-                moveAt(event.touches[0].clientX, event.touches[0].clientY);
+                const touch = event.touches[0];
+                const dist = Math.hypot(touch.clientX - startX, touch.clientY - startY);
+                const isFannedChoice = state.mobileFanItemIds.includes(item.id);
+                const threshold = isFannedChoice ? 8 : (isMobileGraphExperience() ? MOBILE_DRAG_THRESHOLD : 5);
+
+                if (!isDragCommitted && dist >= threshold) {
+                    commitDrag(touch.clientX, touch.clientY);
+                } else if (isDragCommitted) {
+                    moveAt(touch.clientX, touch.clientY);
+                }
             }
         }
 
         async function endDrag() {
             document.removeEventListener("mousemove", onMouseMove);
-            document.onmouseup = null;
+            document.removeEventListener("mouseup", onMouseUp);
             document.removeEventListener("touchmove", onTouchMove);
-            document.ontouchend = null;
-            document.ontouchcancel = null;
+            document.removeEventListener("touchend", onTouchEnd);
+            document.removeEventListener("touchcancel", onTouchEnd);
 
-            if (state.isDragging === item.id) {
+            if (isDragCommitted && state.isDragging === item.id) {
                 setState({ isDragging: null });
                 activeDot.classList.remove("dragging");
                 activeDot.style.transition = "";
@@ -168,78 +202,57 @@ export function setupDrag(avgDot, userDot, item, container, { resetMobileGraphVi
                         y = targetY;
                     }
 
-                    setState({
-                        isConfirmingVote: true,
-                        pendingVoteConfirmation: {
-                            itemId: item.id,
-                            vote: {
-                                x: Math.round(x * 10) / 10,
-                                y: Math.round(y * 10) / 10,
-                                username: state.userDisplayName,
-                                timestamp: Date.now(),
-                            },
-                        },
-                    });
-
                     if (showConfirmVoteModalFn) {
                         showConfirmVoteModalFn(item, x, y);
+                    } else {
+                        showConfirmVoteModal(item, x, y);
                     }
                 }
+            } else {
+                // Was a click or quick tap without dragging
+                if (state.isDragging === item.id) {
+                    setState({ isDragging: null });
+                }
+                activeDot.classList.remove("dragging");
+                delete activeDot.dataset.tempX;
+                delete activeDot.dataset.tempY;
+
+                // Hide connection line if it was temporarily shown
+                const line = document.getElementById(`line-${item.id}`);
+                if (line) line.style.display = "none";
+
+                // Trigger selection & tooltip popup
+                handleDotSelection();
             }
         }
 
-        document.addEventListener("mousemove", onMouseMove);
-        document.onmouseup = endDrag;
-        document.addEventListener("touchmove", onTouchMove, { passive: false });
-        document.ontouchend = endDrag;
-        document.ontouchcancel = endDrag;
+        function onMouseUp() {
+            endDrag();
+        }
 
-        moveAt(clientX, clientY);
+        function onTouchEnd() {
+            endDrag();
+        }
+
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", onMouseUp);
+        document.addEventListener("touchmove", onTouchMove, { passive: false });
+        document.addEventListener("touchend", onTouchEnd);
+        document.addEventListener("touchcancel", onTouchEnd);
     };
 
-    avgDot.onmousedown = (e) => startDrag(e.clientX, e.clientY, avgDot, e);
-    userDot.onmousedown = (e) => startDrag(e.clientX, e.clientY, userDot, e);
+    avgDot.onmousedown = (e) => startDragInteraction(e.clientX, e.clientY, avgDot, e);
+    userDot.onmousedown = (e) => startDragInteraction(e.clientX, e.clientY, userDot, e);
 
     avgDot.addEventListener(
         "touchstart",
         (e) => {
             if (e.touches.length === 1) {
                 const touch = e.touches[0];
-                avgDot._touchStartTime = Date.now();
-                avgDot._touchStartX = touch.clientX;
-                avgDot._touchStartY = touch.clientY;
+                startDragInteraction(touch.clientX, touch.clientY, avgDot, e);
             }
         },
         { passive: true },
-    );
-
-    avgDot.addEventListener(
-        "touchmove",
-        (e) => {
-            if (e.touches.length === 1 && avgDot._touchStartTime) {
-                const touch = e.touches[0];
-                const moveX = Math.abs(touch.clientX - avgDot._touchStartX);
-                const moveY = Math.abs(touch.clientY - avgDot._touchStartY);
-                const isFannedChoice = state.mobileFanItemIds.includes(item.id);
-                const dragThreshold = isFannedChoice ? 8 : (isMobileGraphExperience() ? MOBILE_DRAG_THRESHOLD : 5);
-
-                if (moveX > dragThreshold || moveY > dragThreshold) {
-                    if (
-                        isMobileGraphExperience() &&
-                        state.highlightedId !== item.id &&
-                        !state.mobileFanItemIds.includes(item.id)
-                    ) {
-                        avgDot._touchStartTime = null;
-                        return;
-                    }
-                    if (!state.isDragging) {
-                        startDrag(touch.clientX, touch.clientY, avgDot, e);
-                    }
-                    avgDot._touchStartTime = null;
-                }
-            }
-        },
-        { passive: false },
     );
 
     userDot.addEventListener(
@@ -247,31 +260,9 @@ export function setupDrag(avgDot, userDot, item, container, { resetMobileGraphVi
         (e) => {
             if (e.touches.length === 1) {
                 const touch = e.touches[0];
-                userDot._touchStartTime = Date.now();
-                userDot._touchStartX = touch.clientX;
-                userDot._touchStartY = touch.clientY;
+                startDragInteraction(touch.clientX, touch.clientY, userDot, e);
             }
         },
         { passive: true },
-    );
-
-    userDot.addEventListener(
-        "touchmove",
-        (e) => {
-            if (e.touches.length === 1 && userDot._touchStartTime) {
-                const touch = e.touches[0];
-                const moveX = Math.abs(touch.clientX - userDot._touchStartX);
-                const moveY = Math.abs(touch.clientY - userDot._touchStartY);
-                const dragThreshold = isMobileGraphExperience() ? MOBILE_DRAG_THRESHOLD : 5;
-
-                if (moveX > dragThreshold || moveY > dragThreshold) {
-                    if (!state.isDragging) {
-                        startDrag(touch.clientX, touch.clientY, userDot, e);
-                    }
-                    userDot._touchStartTime = null;
-                }
-            }
-        },
-        { passive: false },
     );
 }

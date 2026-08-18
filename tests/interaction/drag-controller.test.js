@@ -55,6 +55,7 @@ describe("drag-controller UX contracts", () => {
 
         expect(userDot.style.display).toBe("block");
         expect(line.style.display).toBe("block");
+        document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
     });
 
     it("prevents drag when voting is disabled and user is not admin", () => {
@@ -62,8 +63,10 @@ describe("drag-controller UX contracts", () => {
         setupDrag(avgDot, userDot, { id: "tool_01", x: 50, y: 50 }, container);
 
         avgDot.dispatchEvent(new MouseEvent("mousedown", { clientX: 250, clientY: 250, bubbles: true }));
+        document.dispatchEvent(new MouseEvent("mousemove", { clientX: 300, clientY: 300, bubbles: true }));
         expect(state.isDragging).toBeNull();
         expect(userDot.style.display).toBe("none");
+        document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
     });
 
     it("allows drag when user is admin even if general voting is disabled", () => {
@@ -71,8 +74,10 @@ describe("drag-controller UX contracts", () => {
         setupDrag(avgDot, userDot, { id: "tool_01", x: 50, y: 50 }, container);
 
         avgDot.dispatchEvent(new MouseEvent("mousedown", { clientX: 250, clientY: 250, bubbles: true }));
+        document.dispatchEvent(new MouseEvent("mousemove", { clientX: 300, clientY: 300, bubbles: true }));
         expect(state.isDragging).toBe("tool_01");
         expect(userDot.style.display).toBe("block");
+        document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
     });
 
     it("locks Y coordinate to current/baseline in 1D view mode upon drop", () => {
@@ -97,5 +102,27 @@ describe("drag-controller UX contracts", () => {
 
         expect(confirmedItem).not.toBeNull();
         expect(confirmedY).toBe(70); // Locked to baseline Y=70 despite mouse Y=100
+    });
+
+    it("tapping or clicking dot with minimal movement selects/highlights item and toggles tooltip without voting", () => {
+        let confirmedItem = null;
+        setupDrag(avgDot, userDot, { id: "tool_01", name: "Denoising", x: 50, y: 50 }, container, {
+            showConfirmVoteModalFn: (item) => {
+                confirmedItem = item;
+            },
+        });
+
+        // Click / tap without significant movement (2px movement)
+        avgDot.dispatchEvent(new MouseEvent("mousedown", { clientX: 250, clientY: 250, bubbles: true }));
+        document.dispatchEvent(new MouseEvent("mousemove", { clientX: 252, clientY: 251, bubbles: true }));
+        document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+
+        // Must NOT trigger vote confirmation
+        expect(confirmedItem).toBeNull();
+        expect(state.isDragging).toBeNull();
+
+        // Must select/highlight the item and activate tooltip
+        expect(state.highlightedId).toBe("tool_01");
+        expect(avgDot.classList.contains("tooltip-active")).toBe(true);
     });
 });

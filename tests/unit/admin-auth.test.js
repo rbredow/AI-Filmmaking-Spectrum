@@ -97,6 +97,7 @@ describe("admin authentication & authorization permissions", () => {
             setupDrag(avgDot, userDot, { id: "item_01", x: 50, y: 50 }, container);
 
             avgDot.dispatchEvent(new MouseEvent("mousedown", { clientX: 250, clientY: 250, bubbles: true }));
+            document.dispatchEvent(new MouseEvent("mousemove", { clientX: 300, clientY: 300, bubbles: true }));
             expect(state.isDragging).toBe("item_01");
             document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
         });

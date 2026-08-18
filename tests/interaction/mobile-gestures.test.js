@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { clampMobileGraphView } from "../../src/core/coords.js";
 import { findCollisionCluster, computeFanPositions } from "../../src/core/clustering.js";
+import { state, setState } from "../../src/state/app-state.js";
+import { layoutMobileFan, clearMobileFan } from "../../src/ui/mobile-gestures.js";
 
 describe("mobile-gestures UX contracts", () => {
     let container;
@@ -8,12 +10,34 @@ describe("mobile-gestures UX contracts", () => {
     beforeEach(() => {
         document.body.innerHTML = `
             <div id="graph-container" style="width: 390px; height: 400px; position: relative;">
-                <div id="dot-d01" class="dot" data-real-x="20" data-real-y="80"></div>
-                <div id="dot-d02" class="dot" data-real-x="21" data-real-y="81"></div>
-                <div id="dot-d03" class="dot" data-real-x="90" data-real-y="10"></div>
+                <svg id="connections-layer" viewBox="0 0 100 100"></svg>
+                <div id="dot-d01" class="dot" data-real-x="20" data-real-y="80">
+                    <div id="label-d01" class="dot-label">Denoising</div>
+                </div>
+                <div id="dot-d02" class="dot" data-real-x="21" data-real-y="81">
+                    <div id="label-d02" class="dot-label">Script Breakdown</div>
+                </div>
+                <div id="dot-d03" class="dot" data-real-x="90" data-real-y="10">
+                    <div id="label-d03" class="dot-label">Idea to Script</div>
+                </div>
             </div>
         `;
         container = document.getElementById("graph-container");
+        Object.defineProperty(container, "clientWidth", { value: 390, configurable: true });
+        Object.defineProperty(container, "clientHeight", { value: 400, configurable: true });
+        // Mock window matchMedia for mobile
+        window.matchMedia = (query) => ({
+            matches: true,
+            media: query,
+            onchange: null,
+            addListener: () => {},
+            removeListener: () => {},
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            dispatchEvent: () => true,
+        });
+        window.innerWidth = 390;
+        window.innerHeight = 844;
     });
 
     describe("Zoom & viewport state", () => {
@@ -64,6 +88,36 @@ describe("mobile-gestures UX contracts", () => {
             expect(fanned.length).toBe(2);
             expect(fanned[0].origin).toEqual({ x: 80, y: 100 });
             expect(fanned[1].origin).toEqual({ x: 85, y: 105 });
+        });
+
+        it("layoutMobileFan applies --mobile-fan-x and --mobile-fan-y CSS variables", () => {
+            setState({
+                mobileFanItemIds: ["d01", "d02"],
+                renderedItems: new Set(["d01", "d02", "d03"]),
+                itemsCache: {
+                    d01: { name: "Denoising", x: 20, y: 80 },
+                    d02: { name: "Script Breakdown", x: 21, y: 81 },
+                },
+            });
+
+            layoutMobileFan(container);
+
+            const dot1 = document.getElementById("dot-d01");
+            const dot2 = document.getElementById("dot-d02");
+
+            expect(dot1.classList.contains("mobile-fanned")).toBe(true);
+            expect(dot2.classList.contains("mobile-fanned")).toBe(true);
+
+            expect(dot1.style.getPropertyValue("--mobile-fan-x")).toBeDefined();
+            expect(dot1.style.getPropertyValue("--mobile-fan-y")).toBeDefined();
+            expect(dot2.style.getPropertyValue("--mobile-fan-x")).toBeDefined();
+            expect(dot2.style.getPropertyValue("--mobile-fan-y")).toBeDefined();
+
+            const connectors = container.querySelectorAll(".mobile-fan-connector");
+            expect(connectors.length).toBe(2);
+
+            const origins = container.querySelectorAll(".mobile-fan-origin");
+            expect(origins.length).toBe(2);
         });
     });
 });

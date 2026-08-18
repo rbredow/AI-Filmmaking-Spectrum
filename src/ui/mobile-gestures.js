@@ -5,17 +5,14 @@ import {
     baseGraphPoint,
     projectedMobileGraphPoint,
 } from "../core/coords.js";
-import {
-    findCollisionCluster,
-    findNearestItem,
-    computeFanPositions,
-} from "../core/clustering.js";
-import { highlightItem, clearHighlight } from "./highlight.js";
+import { highlightItem, clearHighlight, getHighlightedId } from "./highlight.js";
 import { positionElementForCurrentView, updateConnectionLine } from "./graph-renderer.js";
+import { showToast } from "./toast.js";
 import {
     MOBILE_MIN_ZOOM,
     MOBILE_MAX_ZOOM,
     MOBILE_FAN_THRESHOLD,
+    MOBILE_DRAG_THRESHOLD,
 } from "../config/constants.js";
 
 let mobileViewAnimationTimer = null;
@@ -54,6 +51,57 @@ export function mobileDisplayedPoint(id, container) {
         x: rect.left + rect.width / 2 - containerRect.left,
         y: rect.top + rect.height / 2 - containerRect.top,
     };
+}
+
+export function nearestMobileItem(clientX, clientY, container, ids, maxDistance = 52) {
+    const containerRect = container.getBoundingClientRect();
+    const x = clientX - containerRect.left;
+    const y = clientY - containerRect.top;
+    let nearest = null;
+    let nearestDistance = maxDistance;
+
+    ids.forEach((id) => {
+        const dot = document.getElementById(`dot-${id}`);
+        if (!dot || dot.classList.contains("onboarding-hidden")) return;
+        const point = mobileDisplayedPoint(id, container);
+        if (!point) return;
+        const distance = Math.hypot(point.x - x, point.y - y);
+        if (distance < nearestDistance) {
+            nearest = id;
+            nearestDistance = distance;
+        }
+    });
+    return nearest;
+}
+
+export function mobileCollisionCluster(seedId, container) {
+    const ids = [...state.renderedItems];
+    const points = new Map(
+        ids.map((id) => [id, mobileTruePoint(id, container)]),
+    );
+    const cluster = new Set([seedId]);
+    const queue = [seedId];
+
+    while (queue.length) {
+        const currentId = queue.shift();
+        const current = points.get(currentId);
+        if (!current) continue;
+        ids.forEach((candidateId) => {
+            if (cluster.has(candidateId)) return;
+            const candidate = points.get(candidateId);
+            if (
+                candidate &&
+                Math.hypot(current.x - candidate.x, current.y - candidate.y) <= MOBILE_FAN_THRESHOLD
+            ) {
+                cluster.add(candidateId);
+                queue.push(candidateId);
+            }
+        });
+    }
+
+    return [...cluster].sort((a, b) =>
+        (state.itemsCache[a]?.name || "").localeCompare(state.itemsCache[b]?.name || ""),
+    );
 }
 
 export function applyMobileGraphView(container, { animate = false } = {}) {
@@ -168,20 +216,36 @@ export function removeMobileFanGraphics() {
 }
 
 export function clearMobileFan() {
+    if (!state.mobileFanItemIds.length) return;
+    const collapsingIds = [...state.mobileFanItemIds];
+    state.mobileFanItemIds = [];
+    removeMobileFanGraphics();
     const container = document.getElementById("graph-container");
     if (container) {
         container.classList.remove("mobile-cluster-focus");
-        container.querySelectorAll(".mobile-cluster-focus-label").forEach((el) => el.remove());
+        container.querySelector(".mobile-cluster-focus-label")?.remove();
     }
-    removeMobileFanGraphics();
-    state.mobileFanItemIds.forEach((id) => {
+    collapsingIds.forEach((id) => {
         const dot = document.getElementById(`dot-${id}`);
         if (!dot) return;
-        dot.classList.remove("mobile-fanned", "mobile-fan-primary");
-        dot.style.setProperty("--fan-tx", "0px");
-        dot.style.setProperty("--fan-ty", "0px");
+        dot.classList.add("mobile-fan-collapsing");
+        dot.style.setProperty("--mobile-fan-x", "0px");
+        dot.style.setProperty("--mobile-fan-y", "0px");
+        setTimeout(() => {
+            if (state.mobileFanItemIds.includes(id)) return;
+            dot.classList.remove(
+                "mobile-fanned",
+                "mobile-fan-collapsing",
+                "mobile-label-left",
+                "mobile-label-right",
+                "mobile-label-below",
+            );
+            dot.style.removeProperty("--mobile-fan-x");
+            dot.style.removeProperty("--mobile-fan-y");
+            dot.style.removeProperty("--mobile-label-x");
+            dot.style.removeProperty("--mobile-label-y");
+        }, 360);
     });
-    state.mobileFanItemIds = [];
 }
 
 export function layoutMobileFan(container) {
@@ -202,30 +266,113 @@ export function layoutMobileFan(container) {
     }
     focusLabel.textContent = `Zoomed cluster · ${points.length} tools`;
 
-    const targets = computeFanPositions(points, { minimumGap: 58, passes: 14 });
+    const center = {
+        x: points.reduce((sum, entry) => sum + entry.point.x, 0) / points.length,
+        y: points.reduce((sum, entry) => sum + entry.point.y, 0) / points.length,
+    };
+    const targets = points.map(({ id, point }, index) => {
+        const angle = -Math.PI / 2 + (index / points.length) * Math.PI * 2;
+        return {
+            id,
+            origin: point,
+            x: point.x + Math.cos(angle) * 2,
+            y: point.y + Math.sin(angle) * 2,
+        };
+    });
+    const minimumGap = 58;
+    for (let pass = 0; pass < 14; pass++) {
+        for (let i = 0; i < targets.length; i++) {
+            for (let j = i + 1; j < targets.length; j++) {
+                const a = targets[i];
+                const b = targets[j];
+                let dx = b.x - a.x;
+                let dy = b.y - a.y;
+                let distance = Math.hypot(dx, dy);
+                if (distance < 0.01) {
+                    const angle = ((i + j + 1) / targets.length) * Math.PI * 2;
+                    dx = Math.cos(angle);
+                    dy = Math.sin(angle);
+                    distance = 1;
+                }
+                if (distance >= minimumGap) continue;
+                const push = (minimumGap - distance) * 0.36;
+                const nx = dx / distance;
+                const ny = dy / distance;
+                a.x -= nx * push;
+                a.y -= ny * push;
+                b.x += nx * push;
+                b.y += ny * push;
+            }
+        }
+        targets.forEach((target) => {
+            target.x += (target.origin.x - target.x) * 0.08;
+            target.y += (target.origin.y - target.y) * 0.08;
+        });
+    }
+    targets.forEach((target) => {
+        const dx = target.x - target.origin.x;
+        const dy = target.y - target.origin.y;
+        const distance = Math.hypot(dx, dy);
+        const maxShift = 38;
+        if (distance > maxShift) {
+            target.x = target.origin.x + (dx / distance) * maxShift;
+            target.y = target.origin.y + (dy / distance) * maxShift;
+        }
+        target.x = Math.max(34, Math.min(container.clientWidth - 34, target.x));
+        target.y = Math.max(76, Math.min(container.clientHeight - 58, target.y));
+    });
+
     const svgLayer = document.getElementById("connections-layer");
 
-    targets.forEach((target, index) => {
-        const dot = document.getElementById(`dot-${target.id}`);
+    targets.forEach(({ id, origin: point, x: targetX, y: targetY }) => {
+        const dot = document.getElementById(`dot-${id}`);
         if (!dot) return;
+        const wasFanned = dot.classList.contains("mobile-fanned");
+        dot.classList.remove(
+            "mobile-fan-collapsing",
+            "mobile-label-left",
+            "mobile-label-right",
+            "mobile-label-below",
+        );
         dot.classList.add("mobile-fanned");
-        dot.classList.toggle("mobile-fan-primary", index === 0);
-
-        const currentPoint = mobileTruePoint(target.id, container);
-        if (!currentPoint) return;
-        const tx = target.x - currentPoint.x;
-        const ty = target.y - currentPoint.y;
-        dot.style.setProperty("--fan-tx", `${Math.round(tx)}px`);
-        dot.style.setProperty("--fan-ty", `${Math.round(ty)}px`);
+        const outwardX = targetX - center.x;
+        const outwardY = targetY - center.y;
+        if (Math.abs(outwardX) > Math.abs(outwardY) * 0.55) {
+            dot.classList.add(outwardX < 0 ? "mobile-label-left" : "mobile-label-right");
+        } else if (outwardY > 0) {
+            dot.classList.add("mobile-label-below");
+        }
+        const fanX = `${targetX - point.x}px`;
+        const fanY = `${targetY - point.y}px`;
+        if (wasFanned) {
+            dot.style.setProperty("--mobile-fan-x", fanX);
+            dot.style.setProperty("--mobile-fan-y", fanY);
+        } else {
+            dot.style.setProperty("--mobile-fan-x", "0px");
+            dot.style.setProperty("--mobile-fan-y", "0px");
+            requestAnimationFrame(() => {
+                if (!state.mobileFanItemIds.includes(id)) return;
+                dot.style.setProperty("--mobile-fan-x", fanX);
+                dot.style.setProperty("--mobile-fan-y", fanY);
+            });
+        }
 
         if (svgLayer) {
             const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
             line.setAttribute("class", "mobile-fan-connector");
-            line.setAttribute("x1", `${(target.origin.x / container.clientWidth) * 100}`);
-            line.setAttribute("y1", `${(target.origin.y / container.clientHeight) * 100}`);
-            line.setAttribute("x2", `${(target.x / container.clientWidth) * 100}`);
-            line.setAttribute("y2", `${(target.y / container.clientHeight) * 100}`);
+            line.setAttribute("x1", `${(point.x / container.clientWidth) * 100}`);
+            line.setAttribute("y1", `${(point.y / container.clientHeight) * 100}`);
+            line.setAttribute("x2", `${(targetX / container.clientWidth) * 100}`);
+            line.setAttribute("y2", `${(targetY / container.clientHeight) * 100}`);
             svgLayer.appendChild(line);
+
+            const origin = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
+            origin.setAttribute("class", "mobile-fan-origin");
+            origin.setAttribute("cx", `${(point.x / container.clientWidth) * 100}`);
+            origin.setAttribute("cy", `${(point.y / container.clientHeight) * 100}`);
+            origin.setAttribute("rx", `${(7 / container.clientWidth) * 100}`);
+            origin.setAttribute("ry", `${(7 / container.clientHeight) * 100}`);
+            svgLayer.appendChild(origin);
         }
     });
 
@@ -233,59 +380,60 @@ export function layoutMobileFan(container) {
 }
 
 export function expandMobileFan(ids, container) {
-    if (!container || !ids.length || !isMobileGraphExperience()) return;
+    rememberMobileGraphView();
     clearMobileFan();
-    state.mobileFanItemIds = [...ids];
+    clearHighlight();
+    focusMobileGraphOnCluster(ids, container);
+    state.mobileFocusedClusterIds = [...ids];
+    state.mobileFanItemIds = ids;
     layoutMobileFan(container);
+    showToast(`${ids.length} tools here — choose one`);
 }
 
 export function selectMobileItem(id) {
-    const container = document.getElementById("graph-container");
-    const wasFanned = state.mobileFanItemIds.includes(id);
-    const returnView = state.mobileGraphReturnView;
     clearMobileFan();
-    state.mobileFocusedClusterIds = [];
-    state.mobileGraphReturnView = returnView;
+    const container = document.getElementById("graph-container");
+    if (container && isMobileGraphExperience()) {
+        rememberMobileGraphView();
+        focusMobileGraphOnCluster([id], container, 1.65);
+    }
     highlightItem(id);
-
     const row = document.getElementById(`panel-row-${id}`);
-    if (row) {
-        row.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-
-    if (wasFanned && container) {
-        scheduleMobileLabelClamp(container);
-    }
+    if (row) row.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 export function scheduleMobileLabelClamp(container) {
     if (!container || !isMobileGraphExperience()) return;
     if (mobileLabelClampFrame) cancelAnimationFrame(mobileLabelClampFrame);
     mobileLabelClampFrame = requestAnimationFrame(() => {
-        mobileLabelClampFrame = null;
         const containerRect = container.getBoundingClientRect();
-        const activeIds = state.mobileFanItemIds.length
-            ? state.mobileFanItemIds
-            : state.highlightedId
-              ? [state.highlightedId]
-              : [];
-
-        activeIds.forEach((id) => {
-            const label = document.getElementById(`label-${id}`);
-            const dot = document.getElementById(`dot-${id}`);
-            if (!label || !dot) return;
-            label.style.transform = "";
+        const labels = container.querySelectorAll(
+            ".dot.mobile-fanned .dot-label, .dot.highlighted .dot-label",
+        );
+        labels.forEach((label) => {
+            label.style.setProperty("--mobile-label-x", "0px");
+            label.style.setProperty("--mobile-label-y", "0px");
+        });
+        labels.forEach((label) => {
             const rect = label.getBoundingClientRect();
-            let shiftX = 0;
-            const margin = 10;
-            if (rect.left < containerRect.left + margin) {
-                shiftX = containerRect.left + margin - rect.left;
-            } else if (rect.right > containerRect.right - margin) {
-                shiftX = containerRect.right - margin - rect.right;
+            const padding = 8;
+            const topPadding = state.mobileGraphView.scale > 1.01 ? 48 : padding;
+            let x = 0;
+            let y = 0;
+            if (rect.left < containerRect.left + padding) {
+                x += containerRect.left + padding - rect.left;
             }
-            if (Math.abs(shiftX) > 1) {
-                label.style.transform = `translateX(calc(-50% + ${Math.round(shiftX)}px))`;
+            if (rect.right > containerRect.right - padding) {
+                x -= rect.right - (containerRect.right - padding);
             }
+            if (rect.top < containerRect.top + topPadding) {
+                y += containerRect.top + topPadding - rect.top;
+            }
+            if (rect.bottom > containerRect.bottom - padding) {
+                y -= rect.bottom - (containerRect.bottom - padding);
+            }
+            label.style.setProperty("--mobile-label-x", `${x}px`);
+            label.style.setProperty("--mobile-label-y", `${y}px`);
         });
     });
 }
@@ -293,141 +441,231 @@ export function scheduleMobileLabelClamp(container) {
 export function setupMobileGraphInteractions(container) {
     if (!container) return;
 
-    let controls = container.querySelector(".mobile-graph-controls");
-    if (!controls) {
-        controls = document.createElement("div");
-        controls.className = "mobile-graph-controls";
-        controls.innerHTML = `
-            <button type="button" class="mobile-zoom-btn zoom-in" aria-label="Zoom in">+</button>
-            <span class="mobile-zoom-readout">1×</span>
-            <button type="button" class="mobile-zoom-btn zoom-out" aria-label="Zoom out">−</button>
-            <button type="button" class="mobile-zoom-btn zoom-reset" aria-label="Reset zoom">Reset</button>
-        `;
-        container.appendChild(controls);
+    let zoomControls = container.querySelector(".mobile-zoom-controls");
+    if (!zoomControls) {
+        zoomControls = document.createElement("div");
+        zoomControls.className = "mobile-zoom-controls";
+        zoomControls.setAttribute("aria-label", "Graph zoom controls");
+        const zoomOut = document.createElement("button");
+        zoomOut.type = "button";
+        zoomOut.className = "mobile-zoom-out";
+        zoomOut.setAttribute("aria-label", "Zoom out");
+        zoomOut.textContent = "−";
+        const zoomReadout = document.createElement("button");
+        zoomReadout.type = "button";
+        zoomReadout.className = "mobile-zoom-readout";
+        zoomReadout.setAttribute("aria-label", "Reset graph zoom");
+        zoomReadout.textContent = "1×";
+        const zoomIn = document.createElement("button");
+        zoomIn.type = "button";
+        zoomIn.className = "mobile-zoom-in";
+        zoomIn.setAttribute("aria-label", "Zoom in");
+        zoomIn.textContent = "+";
+        zoomControls.append(zoomOut, zoomReadout, zoomIn);
+        container.appendChild(zoomControls);
 
-        controls.querySelector(".zoom-in").onclick = (e) => {
-            e.stopPropagation();
-            setMobileGraphZoom(container, state.mobileGraphView.scale + 0.5, container.clientWidth / 2, container.clientHeight / 2, true);
+        zoomOut.onclick = (event) => {
+            event.stopPropagation();
+            clearMobileFan();
+            setMobileGraphZoom(
+                container,
+                state.mobileGraphView.scale / 1.4,
+                container.clientWidth / 2,
+                container.clientHeight / 2,
+                true,
+            );
         };
-        controls.querySelector(".zoom-out").onclick = (e) => {
-            e.stopPropagation();
-            setMobileGraphZoom(container, state.mobileGraphView.scale - 0.5, container.clientWidth / 2, container.clientHeight / 2, true);
+        zoomIn.onclick = (event) => {
+            event.stopPropagation();
+            clearMobileFan();
+            setMobileGraphZoom(
+                container,
+                state.mobileGraphView.scale * 1.4,
+                container.clientWidth / 2,
+                container.clientHeight / 2,
+                true,
+            );
         };
-        controls.querySelector(".zoom-reset").onclick = (e) => {
-            e.stopPropagation();
+        zoomReadout.onclick = (event) => {
+            event.stopPropagation();
             resetMobileGraphView(container, true);
         };
     }
 
-    container.addEventListener("touchstart", (e) => {
-        if (state.isDragging || !isMobileGraphExperience()) return;
-        if (e.target.closest(".mobile-graph-controls, button, input, .tooltip")) return;
+    const isInteractiveChrome = (target) =>
+        target instanceof Element &&
+        target.closest(
+            "#top-right-controls, .mobile-zoom-controls, .tooltip, .onboarding-overlay, button, input, a",
+        );
 
-        if (e.touches.length === 1) {
-            const touch = e.touches[0];
+    const localTouch = (touch) => {
+        const rect = container.getBoundingClientRect();
+        return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+    };
+
+    const beginPinch = (event) => {
+        clearMobileFan();
+        const a = localTouch(event.touches[0]);
+        const b = localTouch(event.touches[1]);
+        const midpoint = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        mobileViewportGesture = {
+            type: "pinch",
+            startDistance: Math.hypot(b.x - a.x, b.y - a.y),
+            startScale: state.mobileGraphView.scale,
+            contentX: (midpoint.x - state.mobileGraphView.offsetX) / state.mobileGraphView.scale,
+            contentY: (midpoint.y - state.mobileGraphView.offsetY) / state.mobileGraphView.scale,
+        };
+        mobileGraphTapStart = null;
+        container.classList.add("mobile-view-manipulating");
+    };
+
+    container.addEventListener(
+        "touchstart",
+        (event) => {
+            if (!isMobileGraphExperience() || isInteractiveChrome(event.target)) {
+                mobileGraphTapStart = null;
+                return;
+            }
+            if (event.touches.length === 2) {
+                beginPinch(event);
+                return;
+            }
+            if (event.touches.length !== 1) {
+                mobileGraphTapStart = null;
+                return;
+            }
+            const touch = event.touches[0];
             mobileGraphTapStart = {
                 x: touch.clientX,
                 y: touch.clientY,
                 time: Date.now(),
-                target: e.target,
+                canPan:
+                    state.mobileGraphView.scale > 1.01 &&
+                    !(event.target instanceof Element &&
+                        event.target.closest(".dot, .user-dot")),
             };
-            mobileViewportGesture = {
-                mode: "pan",
-                startX: touch.clientX,
-                startY: touch.clientY,
-                initialOffsetX: state.mobileGraphView.offsetX,
-                initialOffsetY: state.mobileGraphView.offsetY,
-            };
-        } else if (e.touches.length === 2) {
-            mobileGraphTapStart = null;
-            const t1 = e.touches[0];
-            const t2 = e.touches[1];
-            const containerRect = container.getBoundingClientRect();
-            mobileViewportGesture = {
-                mode: "pinch",
-                initialDistance: Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY),
-                initialScale: state.mobileGraphView.scale,
-                focalX: (t1.clientX + t2.clientX) / 2 - containerRect.left,
-                focalY: (t1.clientY + t2.clientY) / 2 - containerRect.top,
-            };
-        }
-    }, { passive: true });
+        },
+        { passive: true },
+    );
 
-    container.addEventListener("touchmove", (e) => {
-        if (!mobileViewportGesture || state.isDragging || !isMobileGraphExperience()) return;
-        if (mobileViewportGesture.mode === "pan" && e.touches.length === 1) {
-            const touch = e.touches[0];
-            const dx = touch.clientX - mobileViewportGesture.startX;
-            const dy = touch.clientY - mobileViewportGesture.startY;
-            if (state.mobileGraphView.scale > 1.01 || Math.hypot(dx, dy) > 12) {
-                if (state.mobileGraphView.scale > 1.01) {
-                    e.preventDefault();
-                    state.mobileGraphView.offsetX = mobileViewportGesture.initialOffsetX + dx;
-                    state.mobileGraphView.offsetY = mobileViewportGesture.initialOffsetY + dy;
+    container.addEventListener(
+        "touchmove",
+        (event) => {
+            if (!isMobileGraphExperience()) return;
+            if (event.touches.length === 2) {
+                if (mobileViewportGesture?.type !== "pinch") beginPinch(event);
+                const a = localTouch(event.touches[0]);
+                const b = localTouch(event.touches[1]);
+                const midpoint = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+                const distance = Math.hypot(b.x - a.x, b.y - a.y);
+                state.mobileGraphView.scale = Math.max(
+                    MOBILE_MIN_ZOOM,
+                    Math.min(
+                        MOBILE_MAX_ZOOM,
+                        mobileViewportGesture.startScale *
+                            (distance / Math.max(1, mobileViewportGesture.startDistance)),
+                    ),
+                );
+                state.mobileGraphView.offsetX = midpoint.x - mobileViewportGesture.contentX * state.mobileGraphView.scale;
+                state.mobileGraphView.offsetY = midpoint.y - mobileViewportGesture.contentY * state.mobileGraphView.scale;
+                applyMobileGraphView(container);
+                event.preventDefault();
+                return;
+            }
+            if (event.touches.length === 1 && mobileGraphTapStart) {
+                const touch = event.touches[0];
+                const dx = touch.clientX - mobileGraphTapStart.x;
+                const dy = touch.clientY - mobileGraphTapStart.y;
+                const movement = Math.hypot(dx, dy);
+                if (
+                    !mobileViewportGesture &&
+                    mobileGraphTapStart.canPan &&
+                    movement > MOBILE_DRAG_THRESHOLD
+                ) {
+                    clearMobileFan();
+                    mobileViewportGesture = {
+                        type: "pan",
+                        lastX: touch.clientX,
+                        lastY: touch.clientY,
+                    };
+                    container.classList.add("mobile-view-manipulating");
+                }
+                if (mobileViewportGesture?.type === "pan") {
+                    state.mobileGraphView.offsetX += touch.clientX - mobileViewportGesture.lastX;
+                    state.mobileGraphView.offsetY += touch.clientY - mobileViewportGesture.lastY;
+                    mobileViewportGesture.lastX = touch.clientX;
+                    mobileViewportGesture.lastY = touch.clientY;
                     applyMobileGraphView(container);
+                    event.preventDefault();
                 }
             }
-        } else if (mobileViewportGesture.mode === "pinch" && e.touches.length === 2) {
-            e.preventDefault();
-            const t1 = e.touches[0];
-            const t2 = e.touches[1];
-            const distance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-            const scale = (distance / Math.max(1, mobileViewportGesture.initialDistance)) * mobileViewportGesture.initialScale;
-            setMobileGraphZoom(container, scale, mobileViewportGesture.focalX, mobileViewportGesture.focalY, false);
-        }
-    }, { passive: false });
+        },
+        { passive: false },
+    );
 
-    const finishGesture = (e) => {
-        if (!mobileViewportGesture) return;
-        const gesture = mobileViewportGesture;
-        mobileViewportGesture = null;
-
-        if (mobileGraphTapStart && e.changedTouches && e.changedTouches.length) {
-            const touch = e.changedTouches[0];
-            const dx = Math.abs(touch.clientX - mobileGraphTapStart.x);
-            const dy = Math.abs(touch.clientY - mobileGraphTapStart.y);
-            const dt = Date.now() - mobileGraphTapStart.time;
-
-            if (dx < 10 && dy < 10 && dt < 350) {
-                handleMobileGraphTap(touch.clientX, touch.clientY, container);
+    container.addEventListener(
+        "touchend",
+        (event) => {
+            if (mobileViewportGesture) {
+                mobileGraphTapStart = null;
+                if (event.touches.length === 0) {
+                    mobileViewportGesture = null;
+                    container.classList.remove("mobile-view-manipulating");
+                    scheduleMobileLabelClamp(container);
+                } else {
+                    mobileViewportGesture.type = "waiting";
+                }
+                event.preventDefault();
+                return;
             }
-        }
-        mobileGraphTapStart = null;
-        if (state.mobileGraphView.scale > 1.01) clampMobileGraphView(state.mobileGraphView, container);
-    };
+            const start = mobileGraphTapStart;
+            mobileGraphTapStart = null;
+            if (!start || !isMobileGraphExperience() || state.isDragging) return;
+            const touch = event.changedTouches[0];
+            if (!touch) return;
+            const movement = Math.hypot(touch.clientX - start.x, touch.clientY - start.y);
+            if (movement > MOBILE_DRAG_THRESHOLD || Date.now() - start.time > 450) return;
 
-    container.addEventListener("touchend", finishGesture);
-    container.addEventListener("touchcancel", finishGesture);
-}
+            event.preventDefault();
+            if (state.mobileFanItemIds.length) {
+                const selectedId = nearestMobileItem(
+                    touch.clientX,
+                    touch.clientY,
+                    container,
+                    state.mobileFanItemIds,
+                    48,
+                );
+                if (selectedId) selectMobileItem(selectedId);
+                else clearMobileFan();
+                return;
+            }
 
-function handleMobileGraphTap(clientX, clientY, container) {
-    const ids = [...state.renderedItems];
-    const pointsMap = new Map(ids.map((id) => [id, mobileTruePoint(id, container)]));
-
-    const clickedId = findNearestItem(clientX, clientY, ids, (id) => mobileDisplayedPoint(id, container), 44);
-
-    if (!clickedId) {
-        if (!restoreMobileGraphView(container, true)) {
-            clearMobileFan();
-            clearHighlight();
-        }
-        return;
-    }
-
-    if (state.mobileFanItemIds.length && state.mobileFanItemIds.includes(clickedId)) {
-        selectMobileItem(clickedId);
-        return;
-    }
-
-    const cluster = findCollisionCluster(clickedId, ids, pointsMap, state.itemsCache, MOBILE_FAN_THRESHOLD);
-
-    if (cluster.length > 1) {
-        rememberMobileGraphView();
-        state.mobileFocusedClusterIds = [...cluster];
-        focusMobileGraphOnCluster(cluster, container, 2.2);
-        expandMobileFan(cluster, container);
-        highlightItem(cluster[0]);
-    } else {
-        selectMobileItem(clickedId);
-    }
+            const nearestId = nearestMobileItem(
+                touch.clientX,
+                touch.clientY,
+                container,
+                [...state.renderedItems],
+            );
+            if (!nearestId) {
+                const hadHighlight = Boolean(getHighlightedId());
+                clearHighlight();
+                if (!hadHighlight) restoreMobileGraphView(container, true);
+                return;
+            }
+            const cluster = mobileCollisionCluster(nearestId, container);
+            if (
+                getHighlightedId() === nearestId &&
+                state.mobileFocusedClusterIds.length > 1 &&
+                state.mobileFocusedClusterIds.includes(nearestId)
+            ) {
+                expandMobileFan(state.mobileFocusedClusterIds, container);
+            } else if (cluster.length > 1) {
+                expandMobileFan(cluster, container);
+            } else {
+                state.mobileFocusedClusterIds = [nearestId];
+                selectMobileItem(nearestId);
+            }
+        },
+        { passive: false },
+    );
 }

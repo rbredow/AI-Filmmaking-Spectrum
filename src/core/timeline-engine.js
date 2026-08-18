@@ -36,8 +36,9 @@ export function buildUserSessionTimestamps(items, votes, baselineSnapshot = null
 
     const userTimestamps = {};
     const aug15Users = [];
+    const baselineUsers = [];
 
-    // 1. Scan historical snapshot votes to map each user to the latest tool session they voted on
+    // 1. Scan historical snapshot votes to map each user
     Object.keys(votes || {}).forEach((itemId) => {
         const vMap = votes[itemId] || {};
         Object.keys(vMap).forEach((uid) => {
@@ -47,19 +48,24 @@ export function buildUserSessionTimestamps(items, votes, baselineSnapshot = null
                 return;
             }
             if (BASELINE_SNAPSHOT_UIDS.has(uid)) {
-                // Historical voter from Jan - Jun 2026 milestones
-                const t = itemDates[itemId] || new Date("2026-01-17T00:00:00Z").getTime();
-                if (!userTimestamps[uid] || t > userTimestamps[uid]) {
-                    userTimestamps[uid] = t;
-                }
+                if (!baselineUsers.includes(uid)) baselineUsers.push(uid);
             } else {
-                // Voter who joined during August 15 session
                 if (!aug15Users.includes(uid)) aug15Users.push(uid);
             }
         });
     });
 
-    // 2. For Aug 15 session voters, stagger their timestamps across the Aug 15 voting session window
+    // 2. Stagger baseline voters across the Jan 17 - June 2026 milestone window
+    const JAN17 = new Date("2026-01-17T00:00:00Z").getTime();
+    const JUN01 = new Date("2026-06-01T00:00:00Z").getTime();
+    baselineUsers.forEach((uid, idx) => {
+        if (!userTimestamps[uid]) {
+            const step = (JUN01 - JAN17) / Math.max(1, baselineUsers.length);
+            userTimestamps[uid] = Math.round(JAN17 + idx * step);
+        }
+    });
+
+    // 3. For Aug 15 session voters, stagger their timestamps across the Aug 15 voting session window
     const AUG15_START = new Date("2026-08-15T18:30:00Z").getTime();
     const AUG15_END = new Date("2026-08-15T20:30:00Z").getTime();
     aug15Users.forEach((uid, idx) => {

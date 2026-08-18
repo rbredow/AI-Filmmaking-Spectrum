@@ -364,7 +364,7 @@ export function playTimeline() {
     updatePlayPauseIcons(true);
 
     let lastTime = performance.now();
-    const PLAY_SPEED = 10;
+    const PLAY_SPEED = 6;
 
     function step(now) {
         if (!state.isTimelinePlaying) return;
@@ -378,7 +378,6 @@ export function playTimeline() {
             slider.value = "100";
             applyTimelinePosition(100, { direction: 1, skipSplashes: false });
             pauseTimeline();
-            jumpToLive();
             return;
         }
 

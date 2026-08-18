@@ -5,7 +5,7 @@ import {
     getVoteTimestamp,
     formatTimelineDate,
 } from "../../src/core/timeline-engine.js";
-import { applyTimelineTimestamp, buildTimelineData } from "../../src/ui/timeline-ui.js";
+import { applyTimelineTimestamp, buildTimelineData, jumpToLive } from "../../src/ui/timeline-ui.js";
 import { state, setState } from "../../src/state/app-state.js";
 
 describe("timeline-engine", () => {
@@ -46,6 +46,23 @@ describe("timeline-engine", () => {
             expect(sessions.newVoter2).toBeGreaterThanOrEqual(AUG15_START);
             expect(sessions.newVoter2).toBeLessThanOrEqual(AUG15_END);
             expect(sessions.newVoter2).toBeGreaterThan(sessions.newVoter1);
+        });
+
+        it("staggers baseline milestone voters across Jan-Jun window", () => {
+            const items = { d01: { x: 50, y: 50 } };
+            const votes = {
+                d01: {
+                    "0tn0mDj4HOgf5UhinlCi7CvDOk13": { x: 20, y: 30 },
+                    "1NNDJHWh5DOXYrmhP1QfwahR1n62": { x: 40, y: 50 },
+                },
+            };
+            const sessions = buildUserSessionTimestamps(items, votes);
+            const JAN17 = new Date("2026-01-17T00:00:00Z").getTime();
+            const JUN01 = new Date("2026-06-01T00:00:00Z").getTime();
+
+            expect(sessions["0tn0mDj4HOgf5UhinlCi7CvDOk13"]).toBeGreaterThanOrEqual(JAN17);
+            expect(sessions["0tn0mDj4HOgf5UhinlCi7CvDOk13"]).toBeLessThanOrEqual(JUN01);
+            expect(sessions["1NNDJHWh5DOXYrmhP1QfwahR1n62"]).toBeGreaterThan(sessions["0tn0mDj4HOgf5UhinlCi7CvDOk13"]);
         });
 
         it("getVoteTimestamp automatically uses cached session timestamps from buildUserSessionTimestamps", () => {
@@ -138,6 +155,23 @@ describe("timeline-engine", () => {
             // Scrub backward before the vote
             applyTimelineTimestamp(AUG15_START, { direction: -1 });
             expect(voterDot.classList.contains("visible")).toBe(false);
+        });
+
+        it("preserves decaying voter dots when timeline reaches 100% / jumpToLive", () => {
+            const AUG15_START = new Date("2026-08-15T18:30:00Z").getTime();
+            const AUG15_END = new Date("2026-08-15T20:30:00Z").getTime();
+
+            // Set last scrub position
+            applyTimelineTimestamp(AUG15_START, { skipSplashes: true, immediate: true });
+
+            // Scrub forward so voterLate arrives
+            applyTimelineTimestamp(AUG15_END, { direction: 1, skipSplashes: false });
+            const voterDot = document.getElementById("voter-dot-tool_01-voterLate");
+            expect(voterDot.classList.contains("visible")).toBe(true);
+
+            // Jump to live / 100% position: actively decaying dot must remain visible to finish its decay
+            jumpToLive();
+            expect(voterDot.classList.contains("visible")).toBe(true);
         });
     });
 

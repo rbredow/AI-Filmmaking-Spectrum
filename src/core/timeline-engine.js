@@ -18,12 +18,12 @@ export const BASELINE_SNAPSHOT_UIDS = new Set([
 let userSessionTimestampsCache = {};
 
 export function getItemCreationTimestamp(itemId, item) {
-    if (itemId && itemId.startsWith("user_item_")) {
-        const parsed = parseInt(itemId.replace("user_item_", ""), 10);
-        if (!isNaN(parsed) && parsed > 0) return parsed;
-    }
     if (item && item.createdAt) return item.createdAt;
     if (item && item.timestamp) return item.timestamp;
+    if (itemId && itemId.startsWith("user_item_")) {
+        const parsed = parseInt(itemId.replace("user_item_", ""), 10);
+        if (!isNaN(parsed) && parsed > 1000000000000) return parsed;
+    }
     // Base items seeded at project launch
     return new Date("2026-01-17T00:00:00Z").getTime();
 }
@@ -35,10 +35,10 @@ export function buildUserSessionTimestamps(items, votes, baselineSnapshot = null
     });
 
     const userTimestamps = {};
-    const aug15Users = [];
-    const baselineUsers = [];
+    const userMaxToolDate = {};
+    const eventGroups = {};
 
-    // 1. Scan historical snapshot votes to map each user
+    // 1. Correlate each voter with the latest tool creation date they voted on
     Object.keys(votes || {}).forEach((itemId) => {
         const vMap = votes[itemId] || {};
         Object.keys(vMap).forEach((uid) => {
@@ -47,32 +47,29 @@ export function buildUserSessionTimestamps(items, votes, baselineSnapshot = null
                 userTimestamps[uid] = v.timestamp;
                 return;
             }
-            if (BASELINE_SNAPSHOT_UIDS.has(uid)) {
-                if (!baselineUsers.includes(uid)) baselineUsers.push(uid);
-            } else {
-                if (!aug15Users.includes(uid)) aug15Users.push(uid);
+            const t = itemDates[itemId] || getItemCreationTimestamp(itemId, items?.[itemId]);
+            if (!userMaxToolDate[uid] || t > userMaxToolDate[uid]) {
+                userMaxToolDate[uid] = t;
             }
         });
     });
 
-    // 2. Stagger baseline voters across the Jan 17 - June 2026 milestone window
-    const JAN17 = new Date("2026-01-17T00:00:00Z").getTime();
-    const JUN01 = new Date("2026-06-01T00:00:00Z").getTime();
-    baselineUsers.forEach((uid, idx) => {
+    // 2. Group voters by their correlated event timestamp
+    Object.entries(userMaxToolDate).forEach(([uid, eventTime]) => {
         if (!userTimestamps[uid]) {
-            const step = (JUN01 - JAN17) / Math.max(1, baselineUsers.length);
-            userTimestamps[uid] = Math.round(JAN17 + idx * step);
+            if (!eventGroups[eventTime]) eventGroups[eventTime] = [];
+            eventGroups[eventTime].push(uid);
         }
     });
 
-    // 3. For Aug 15 session voters, stagger their timestamps across the Aug 15 voting session window
-    const AUG15_START = new Date("2026-08-15T18:30:00Z").getTime();
-    const AUG15_END = new Date("2026-08-15T20:30:00Z").getTime();
-    aug15Users.forEach((uid, idx) => {
-        if (!userTimestamps[uid]) {
-            const step = (AUG15_END - AUG15_START) / Math.max(1, aug15Users.length);
-            userTimestamps[uid] = Math.round(AUG15_START + idx * step);
-        }
+    // 3. For each event cluster, stagger voters across a 20-minute event session window
+    const SESSION_WINDOW_MS = 20 * 60 * 1000;
+    Object.entries(eventGroups).forEach(([eventTimeStr, uids]) => {
+        const baseTime = parseInt(eventTimeStr, 10);
+        const step = SESSION_WINDOW_MS / Math.max(1, uids.length);
+        uids.forEach((uid, idx) => {
+            userTimestamps[uid] = Math.round(baseTime + (idx + 1) * step);
+        });
     });
 
     userSessionTimestampsCache = userTimestamps;

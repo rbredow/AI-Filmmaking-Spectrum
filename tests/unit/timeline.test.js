@@ -27,55 +27,53 @@ describe("timeline-engine", () => {
     });
 
     describe("buildUserSessionTimestamps and getVoteTimestamp cache", () => {
-        it("staggers unknown Aug 15 session voters across the Aug 15 session window", () => {
+        it("staggers event voters around the creation timestamp of the latest tool they voted on", () => {
+            const event1Time = new Date("2026-01-31T17:36:00Z").getTime();
+            const event2Time = new Date("2026-06-06T17:21:00Z").getTime();
             const items = {
-                d01: { x: 50, y: 50 },
+                d01: { id: "d01", x: 50, y: 50 },
+                user_item_1: { id: "user_item_1", createdAt: event1Time, x: 20, y: 30 },
+                user_item_2: { id: "user_item_2", createdAt: event2Time, x: 80, y: 90 },
             };
             const votes = {
                 d01: {
-                    newVoter1: { x: 10, y: 20 },
-                    newVoter2: { x: 30, y: 40 },
+                    voterJan17: { x: 50, y: 50 },
                 },
-            };
-            const sessions = buildUserSessionTimestamps(items, votes);
-            const AUG15_START = new Date("2026-08-15T18:30:00Z").getTime();
-            const AUG15_END = new Date("2026-08-15T20:30:00Z").getTime();
-
-            expect(sessions.newVoter1).toBeGreaterThanOrEqual(AUG15_START);
-            expect(sessions.newVoter1).toBeLessThanOrEqual(AUG15_END);
-            expect(sessions.newVoter2).toBeGreaterThanOrEqual(AUG15_START);
-            expect(sessions.newVoter2).toBeLessThanOrEqual(AUG15_END);
-            expect(sessions.newVoter2).toBeGreaterThan(sessions.newVoter1);
-        });
-
-        it("staggers baseline milestone voters across Jan-Jun window", () => {
-            const items = { d01: { x: 50, y: 50 } };
-            const votes = {
-                d01: {
-                    "0tn0mDj4HOgf5UhinlCi7CvDOk13": { x: 20, y: 30 },
-                    "1NNDJHWh5DOXYrmhP1QfwahR1n62": { x: 40, y: 50 },
+                user_item_1: {
+                    voterJan31_A: { x: 25, y: 35 },
+                    voterJan31_B: { x: 30, y: 40 },
+                },
+                user_item_2: {
+                    voterJun06: { x: 85, y: 95 },
                 },
             };
             const sessions = buildUserSessionTimestamps(items, votes);
             const JAN17 = new Date("2026-01-17T00:00:00Z").getTime();
-            const JUN01 = new Date("2026-06-01T00:00:00Z").getTime();
 
-            expect(sessions["0tn0mDj4HOgf5UhinlCi7CvDOk13"]).toBeGreaterThanOrEqual(JAN17);
-            expect(sessions["0tn0mDj4HOgf5UhinlCi7CvDOk13"]).toBeLessThanOrEqual(JUN01);
-            expect(sessions["1NNDJHWh5DOXYrmhP1QfwahR1n62"]).toBeGreaterThan(sessions["0tn0mDj4HOgf5UhinlCi7CvDOk13"]);
+            // voterJan17 voted only on d01 -> clustered around Jan 17
+            expect(sessions.voterJan17).toBeGreaterThanOrEqual(JAN17);
+            expect(sessions.voterJan17).toBeLessThan(event1Time);
+
+            // voterJan31_A and B voted on user_item_1 -> clustered around Jan 31
+            expect(sessions.voterJan31_A).toBeGreaterThanOrEqual(event1Time);
+            expect(sessions.voterJan31_B).toBeGreaterThan(sessions.voterJan31_A);
+            expect(sessions.voterJan31_B).toBeLessThan(event2Time);
+
+            // voterJun06 voted on user_item_2 -> clustered around Jun 6
+            expect(sessions.voterJun06).toBeGreaterThanOrEqual(event2Time);
         });
 
         it("getVoteTimestamp automatically uses cached session timestamps from buildUserSessionTimestamps", () => {
-            const items = { d01: { x: 50, y: 50 } };
+            const AUG15_START = new Date("2026-08-15T18:30:00Z").getTime();
+            const items = { user_item_1786819603744: { createdAt: AUG15_START, x: 50, y: 50 } };
             const votes = {
-                d01: {
+                user_item_1786819603744: {
                     voterAlpha: { x: 80, y: 90 },
                 },
             };
             buildUserSessionTimestamps(items, votes);
 
-            const AUG15_START = new Date("2026-08-15T18:30:00Z").getTime();
-            const ts = getVoteTimestamp("d01", "voterAlpha", votes.d01.voterAlpha);
+            const ts = getVoteTimestamp("user_item_1786819603744", "voterAlpha", votes.user_item_1786819603744.voterAlpha);
 
             // Must NOT default to Jan 17 2026
             const jan17 = new Date("2026-01-17T00:00:00Z").getTime();

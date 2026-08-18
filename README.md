@@ -44,12 +44,20 @@ You can [view the project online here](https://rbredow.github.io/AI-Filmmaking-S
 
 ## Development & Setup
 
-1. **Clone repository.**
-2. **Install / Run locally:**
+1. **Clone repository & install dependencies:**
+   ```bash
+   npm install
+   ```
+2. **Run locally:**
    ```bash
    npm run dev
    ```
    *Runs `http-server` on `http://localhost:8000`.*
+3. **Run automated test suite:**
+   ```bash
+   npm test
+   ```
+   *Runs Vitest automated suite (82 tests across 14 test files).*
 
 ## Database Backup & Snapshotting
 

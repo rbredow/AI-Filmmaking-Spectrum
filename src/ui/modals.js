@@ -409,7 +409,7 @@ export function showConfirmVoteModal(item, x, y) {
     if (!modal || !title || !stats) return;
 
     modal.dataset.itemId = item.id;
-    title.innerText = `Vote for ${item.name}`;
+    title.textContent = `Vote for ${item.name}`;
     stats.innerHTML = `
         <div style="margin-top:10px;">
             <strong>${formatAxisPosition(x, "Utility", "Generative")}</strong><br>

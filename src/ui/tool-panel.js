@@ -208,9 +208,16 @@ export function setupFilterControls({ clearMobileFanFn = null } = {}) {
     }
 
     const searchInput = document.getElementById("search-input");
+    const searchClear = document.getElementById("search-clear");
+    const options = { scrollToTop: true, clearMobileFanFn };
     if (searchInput) {
-        searchInput.oninput = () => applyFilters({ scrollToTop: true, clearMobileFanFn });
-        searchInput.addEventListener("search", () => applyFilters({ scrollToTop: true, clearMobileFanFn }));
+        searchInput.addEventListener("input", () => {
+            if (searchClear) {
+                searchClear.style.display = searchInput.value ? "block" : "none";
+            }
+            applyFilters(options);
+        });
+        searchInput.addEventListener("search", () => applyFilters(options));
         searchInput.addEventListener("keydown", (e) => {
             if (e.key === "Enter") {
                 e.preventDefault();
@@ -218,10 +225,21 @@ export function setupFilterControls({ clearMobileFanFn = null } = {}) {
             } else if (e.key === "Escape") {
                 if (searchInput.value) {
                     searchInput.value = "";
-                    applyFilters({ scrollToTop: true, clearMobileFanFn });
+                    applyFilters(options);
                 }
                 searchInput.blur();
             }
+        });
+    }
+
+    if (searchClear) {
+        searchClear.addEventListener("click", () => {
+            if (searchInput) {
+                searchInput.value = "";
+                searchClear.style.display = "none";
+                searchInput.focus();
+            }
+            applyFilters(options);
         });
     }
 }

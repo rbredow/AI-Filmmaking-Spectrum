@@ -125,4 +125,31 @@ describe("drag-controller UX contracts", () => {
         expect(state.highlightedId).toBe("tool_01");
         expect(avgDot.classList.contains("tooltip-active")).toBe(true);
     });
+
+    it("in mobile graph experience, tapping dot highlights item and scrolls panel without activating detailed .tooltip", () => {
+        // Mock mobile touch environment
+        window.matchMedia = (query) => ({
+            matches: query.includes("hover: none") || query.includes("pointer: coarse"),
+            media: query,
+            onchange: null,
+            addListener: () => {},
+            removeListener: () => {},
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            dispatchEvent: () => false,
+        });
+        window.innerWidth = 390;
+        window.innerHeight = 844;
+
+        setupDrag(avgDot, userDot, { id: "tool_01", name: "Denoising", x: 50, y: 50 }, container);
+
+        // Tap on mobile
+        avgDot.dispatchEvent(new MouseEvent("mousedown", { clientX: 200, clientY: 200, bubbles: true }));
+        document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+
+        // Must highlight item (showing small mobile label)
+        expect(state.highlightedId).toBe("tool_01");
+        // Must NOT activate detailed tooltip on mobile
+        expect(avgDot.classList.contains("tooltip-active")).toBe(false);
+    });
 });

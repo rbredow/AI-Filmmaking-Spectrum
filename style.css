@@ -2178,14 +2178,9 @@ button:active {
         opacity: 0;
     }
 
-    /* Tooltips — show inline above dot on tap (not bottom-sheet) */
+    /* On mobile screens, only the compact .dot-label pill is shown. Detailed tooltips are disabled. */
     .tooltip {
-        font-size: var(--fs-xs);
-    }
-
-    .tooltip strong {
-        font-size: var(--fs-sm);
-        margin-bottom: 6px;
+        display: none !important;
     }
 
     /* Voter dots */
@@ -2960,14 +2955,9 @@ button:active {
         background: rgba(59, 130, 246, 0.2);
     }
 
-    /* Tooltip shown via JS class on tap */
-    .dot.tooltip-active {
-        z-index: 1100;
-    }
-
-    .dot.tooltip-active .tooltip {
-        visibility: visible;
-        opacity: 1;
+    /* On touch devices, detailed .tooltip card is disabled in favor of compact .dot-label */
+    .tooltip {
+        display: none !important;
     }
 
     /* Disable text selection during drag */

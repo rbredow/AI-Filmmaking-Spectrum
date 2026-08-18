@@ -29,10 +29,12 @@ export function setupDrag(avgDot, userDot, item, container, { resetMobileGraphVi
         if (row && typeof row.scrollIntoView === "function") {
             row.scrollIntoView({ behavior: "smooth", block: "center" });
         }
-        const isTooltipActive = avgDot.classList.contains("tooltip-active");
-        closeAllTooltips();
-        if (!isTooltipActive) {
-            avgDot.classList.add("tooltip-active");
+        if (!isMobileGraphExperience()) {
+            const isTooltipActive = avgDot.classList.contains("tooltip-active");
+            closeAllTooltips();
+            if (!isTooltipActive) {
+                avgDot.classList.add("tooltip-active");
+            }
         }
     }
 

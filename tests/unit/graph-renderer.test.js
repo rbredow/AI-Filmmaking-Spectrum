@@ -73,4 +73,14 @@ describe("graph-renderer splashes and lines", () => {
         expect(cssContent).not.toMatch(/\.dot:hover[^{]*\{[^}]*scale\(/);
         expect(cssContent).not.toMatch(/\.dot:active[^{]*\{[^}]*scale\(/);
     });
+
+    it("verifies style.css disables detailed .tooltip on mobile to only display compact one-line .dot-label", async () => {
+        const fs = await import("fs");
+        const path = await import("path");
+        const cssContent = fs.readFileSync(path.resolve(__dirname, "../../style.css"), "utf8");
+
+        // Media queries for max-width 600px and hover: none must disable .tooltip
+        expect(cssContent).toMatch(/@media[^{]*max-width:\s*600px[^{]*\{[\s\S]*?\.tooltip\s*\{[\s\S]*?display:\s*none\s*!important/);
+        expect(cssContent).toMatch(/@media[^{]*hover:\s*none[^{]*\{[\s\S]*?\.tooltip\s*\{[\s\S]*?display:\s*none\s*!important/);
+    });
 });

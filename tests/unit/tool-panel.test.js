@@ -8,12 +8,19 @@ describe("tool-panel filtering & search corner cases", () => {
     beforeEach(() => {
         document.body.innerHTML = `
             <div id="graph-container">
-                <div id="dot-tool_1" class="dot" data-real-x="10" data-real-y="90"></div>
-                <div id="dot-tool_2" class="dot" data-real-x="80" data-real-y="20"></div>
-                <div id="dot-tool_3" class="dot" data-real-x="50" data-real-y="50"></div>
+                <div id="dot-tool_1" class="dot" data-real-x="10" data-real-y="90"><span id="dotnum-tool_1"></span></div>
+                <div id="dot-tool_2" class="dot" data-real-x="80" data-real-y="20"><span id="dotnum-tool_2"></span></div>
+                <div id="dot-tool_3" class="dot" data-real-x="50" data-real-y="50"><span id="dotnum-tool_3"></span></div>
             </div>
             <div id="tool-panel-inner"></div>
             <input id="search-input" type="text" />
+            <select id="tool-sort-select">
+                <option value="alphabetical">A–Z</option>
+                <option value="readiness-desc">Most ready</option>
+                <option value="generative-desc">Most generative</option>
+                <option value="readiness-asc">Least ready</option>
+                <option value="generative-asc">Least generative</option>
+            </select>
             <div id="search-clear" style="display: none;"></div>
             <div id="branch-filter-btn">Branch ▾</div>
             <div id="branch-filter-dropdown" style="display: none;"></div>
@@ -149,5 +156,52 @@ describe("tool-panel filtering & search corner cases", () => {
         // Voter dot must remain non-visible
         expect(vDot.classList.contains("visible")).toBe(false);
         expect(vDot.classList.contains("search-match")).toBe(false);
+    });
+
+    it.each([
+        ["readiness-desc", ["tool_1", "tool_3", "tool_2"]],
+        ["readiness-asc", ["tool_2", "tool_3", "tool_1"]],
+        ["generative-desc", ["tool_2", "tool_3", "tool_1"]],
+        ["generative-asc", ["tool_1", "tool_3", "tool_2"]],
+    ])("sorts by displayed consensus for %s", (mode, expectedIds) => {
+        setupFilterControls();
+        const sortSelect = document.getElementById("tool-sort-select");
+        sortSelect.value = mode;
+        sortSelect.dispatchEvent(new Event("change"));
+
+        expect([...panelInner.children].map((row) => row.dataset.itemId)).toEqual(expectedIds);
+        expectedIds.forEach((id, index) => {
+            expect(document.getElementById(`rownum-${id}`).textContent).toBe(String(index + 1));
+            expect(document.getElementById(`dotnum-${id}`).textContent).toBe(String(index + 1));
+        });
+    });
+
+    it("keeps search matches ahead of non-matches while sorting each group", () => {
+        setupFilterControls();
+        const sortSelect = document.getElementById("tool-sort-select");
+        sortSelect.value = "readiness-desc";
+        sortSelect.dispatchEvent(new Event("change"));
+
+        searchInput.value = "script";
+        searchInput.dispatchEvent(new Event("input"));
+
+        expect([...panelInner.children].map((row) => row.dataset.itemId)).toEqual([
+            "tool_3",
+            "tool_2",
+            "tool_1",
+        ]);
+        expect(document.getElementById("panel-row-tool_1").classList.contains("dimmed")).toBe(true);
+    });
+
+    it("uses updated rendered metrics when reapplying the active sort", () => {
+        setupFilterControls();
+        const sortSelect = document.getElementById("tool-sort-select");
+        sortSelect.value = "readiness-desc";
+        sortSelect.dispatchEvent(new Event("change"));
+
+        document.getElementById("dot-tool_2").dataset.realY = "99";
+        applyFilters();
+
+        expect(panelInner.firstElementChild.dataset.itemId).toBe("tool_2");
     });
 });

@@ -181,15 +181,21 @@ p {
     position: sticky;
     top: -1px;
     z-index: 50;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
+    display: grid;
+    gap: 8px;
     padding: 10px 14px 9px;
     background: #0d0d0d;
     border-top: 1px solid #222;
     border-bottom: 2px solid #303030;
     box-shadow: 0 5px 12px rgba(0, 0, 0, 0.28);
+}
+
+#tool-panel-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
 }
 
 #tool-panel-header h3 {
@@ -199,10 +205,34 @@ p {
     white-space: nowrap;
 }
 
-#tool-panel-header #search-container {
-    flex: 1 1 110px;
+#tool-sort-select {
+    color-scheme: dark;
+    flex: 0 1 128px;
+    width: clamp(92px, 44%, 128px);
     min-width: 0;
-    max-width: 140px;
+    max-width: 128px;
+    height: 28px;
+    padding: 0 6px;
+    border: 1px solid #333;
+    border-radius: 4px;
+    background: #111;
+    color: #cbd5e1;
+    font-size: var(--fs-sm);
+    outline: none;
+    cursor: pointer;
+}
+
+#tool-sort-select:hover,
+#tool-sort-select:focus-visible {
+    border-color: #666;
+    background: #1a1a1a;
+    color: #fff;
+}
+
+#tool-panel-header #search-container {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
     padding: 0 8px;
 }
 
@@ -222,13 +252,24 @@ body.onboarding-active #tool-panel-header {
 
 @media (hover: none) and (pointer: coarse) and (max-width: 1000px) and (max-height: 500px) {
     #tool-panel-header {
-        gap: 7px;
+        gap: 6px;
         padding: 8px 10px 7px;
     }
 
     #tool-panel-header #search-container {
-        max-width: 100px;
+        max-width: none;
         padding: 0 6px;
+    }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+    #tool-panel-title-row h3 {
+        font-size: 0;
+    }
+
+    #tool-panel-title-row h3::after {
+        content: "Tools";
+        font-size: var(--type-ui-title-size);
     }
 }
 
@@ -1329,6 +1370,13 @@ body.onboarding-active #tool-panel-header {
 
 .dot:active {
     cursor: grabbing;
+}
+
+#graph-container.voting-closed .dot,
+#graph-container.voting-closed .dot:active,
+#graph-container.voting-closed .user-dot,
+#graph-container.voting-closed .user-dot:active {
+    cursor: pointer;
 }
 
 .dot:hover,

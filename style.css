@@ -206,6 +206,7 @@ p {
 }
 
 #tool-sort-select {
+    color-scheme: dark;
     flex: 0 1 128px;
     width: clamp(92px, 44%, 128px);
     min-width: 0;

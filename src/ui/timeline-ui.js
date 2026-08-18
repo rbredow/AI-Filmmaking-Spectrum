@@ -6,10 +6,18 @@ import {
     getVoteTimestamp,
     formatTimelineDate,
 } from "../core/timeline-engine.js";
+import { escapeHtml } from "../core/formatters.js";
 import { computeConsensus } from "../core/consensus.js";
 import { readinessColor, updateDotColor } from "../core/colors.js";
-import { updateElementPosition, updateLabelPosition, triggerMegaSplash, updateGraphFromData } from "./graph-renderer.js";
+import {
+    updateElementPosition,
+    updateLabelPosition,
+    triggerSplash,
+    triggerMegaSplash,
+    updateGraphFromData,
+} from "./graph-renderer.js";
 import { closeAllTooltips } from "./drag-controller.js";
+import { FADE_TIME } from "../config/constants.js";
 
 let lastScrubTimestamp = 0;
 
@@ -144,6 +152,7 @@ export function applyTimelineTimestamp(targetTime, options = {}) {
         progressFill.style.width = sliderPercent.toFixed(1) + "%";
     }
 
+    const prevScrubTimestamp = lastScrubTimestamp || targetTime;
     const direction = options.direction !== undefined ? options.direction : (targetTime >= lastScrubTimestamp ? 1 : -1);
     lastScrubTimestamp = targetTime;
     state.currentTimelineTimestamp = targetTime;
@@ -189,6 +198,13 @@ export function applyTimelineTimestamp(targetTime, options = {}) {
             dot.style.opacity = "0";
             dot.style.pointerEvents = "none";
             if (panelRow) panelRow.style.display = "none";
+
+            // Hide any voter dots for future item
+            const voterDots = container.querySelectorAll(`.voter-dot[id^="voter-dot-${itemId}-"]`);
+            voterDots.forEach((vDot) => {
+                vDot.classList.remove("visible");
+                clearTimeout(vDot.fadeTimeout);
+            });
         } else {
             const isNewlyRevealed = !state.visibleItemIdsAtCurrentTime.has(itemId);
             state.visibleItemIdsAtCurrentTime.add(itemId);
@@ -204,6 +220,39 @@ export function applyTimelineTimestamp(targetTime, options = {}) {
                 const voteTime = getVoteTimestamp(itemId, uid, v);
                 if (voteTime <= targetTime) {
                     activeVotes[uid] = v;
+
+                    // Show voter dot when scrubbing forward as the vote arrives
+                    const isVoteArriving = direction > 0 && voteTime >= prevScrubTimestamp && !options.skipSplashes;
+                    const isRecentToPlayback = direction > 0 && Math.abs(targetTime - voteTime) <= 6000 && !options.skipSplashes;
+
+                    if ((isVoteArriving || isRecentToPlayback) && uid !== state.currentUser?.uid) {
+                        let vDot = document.getElementById(`voter-dot-${itemId}-${uid}`);
+                        if (!vDot) {
+                            vDot = document.createElement("div");
+                            vDot.className = "voter-dot";
+                            vDot.id = `voter-dot-${itemId}-${uid}`;
+                            vDot.innerHTML = `<div class="voter-username">${escapeHtml(v.username || "Anon")}</div>`;
+                            container.appendChild(vDot);
+                        }
+
+                        updateElementPosition(vDot, v.x, v.y, container);
+                        if (state.viewMode === "1D") vDot.style.bottom = "50%";
+
+                        vDot.classList.add("visible");
+                        clearTimeout(vDot.fadeTimeout);
+                        vDot.fadeTimeout = setTimeout(() => {
+                            vDot.classList.remove("visible");
+                        }, FADE_TIME);
+
+                        triggerSplash(container, v.x, v.y);
+                    }
+                } else if (direction < 0 || voteTime > targetTime) {
+                    // Scrubbing backwards past this vote -> hide voter dot
+                    const vDot = document.getElementById(`voter-dot-${itemId}-${uid}`);
+                    if (vDot) {
+                        vDot.classList.remove("visible");
+                        clearTimeout(vDot.fadeTimeout);
+                    }
                 }
             });
 
@@ -288,7 +337,13 @@ export function closeTimeline() {
     const container = document.getElementById("graph-container");
     if (btn) btn.classList.remove("active");
     if (bar) bar.style.display = "none";
-    if (container) container.classList.remove("mode-timeline", "timeline-open");
+    if (container) {
+        container.classList.remove("mode-timeline", "timeline-open");
+        container.querySelectorAll(".voter-dot.visible").forEach((vDot) => {
+            vDot.classList.remove("visible");
+            clearTimeout(vDot.fadeTimeout);
+        });
+    }
 
     jumpToLive();
 }
@@ -355,7 +410,13 @@ export function jumpToLive() {
     if (slider) slider.value = "100";
 
     const container = document.getElementById("graph-container");
-    if (container) container.classList.remove("mode-timeline");
+    if (container) {
+        container.classList.remove("mode-timeline");
+        container.querySelectorAll(".voter-dot.visible").forEach((vDot) => {
+            vDot.classList.remove("visible");
+            clearTimeout(vDot.fadeTimeout);
+        });
+    }
 
     applyTimelinePosition(100, { skipSplashes: true, isLive: true });
 

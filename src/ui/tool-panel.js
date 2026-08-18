@@ -60,14 +60,6 @@ export function applyFilters(options = {}) {
         if (dot) {
             dot.classList.toggle("search-match", hasFilter && isMatch);
         }
-
-        // Update voter dots on graph
-        const voterDots = document.querySelectorAll(
-            `.voter-dot[id^="voter-dot-${item.id}-"]`,
-        );
-        voterDots.forEach((vDot) => {
-            vDot.classList.toggle("search-match", hasFilter && isMatch);
-        });
     });
 
     matchingItems.sort((a, b) => (a.name || "").localeCompare(b.name || ""));

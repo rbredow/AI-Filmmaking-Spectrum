@@ -1109,23 +1109,17 @@ body.onboarding-active #tool-panel-header {
 
 /* SEARCH DIMMING */
 .searching .dot,
-.searching .voter-dot,
 .searching .connection-line {
     opacity: 0.1 !important;
 }
 
-.searching .dot.search-match,
-.searching .voter-dot.search-match {
+.searching .dot.search-match {
     opacity: 1 !important;
     z-index: 500;
 }
 
 .searching .dot.search-match .dot-label {
     color: #fff;
-    opacity: 1 !important;
-}
-
-.searching .dot.search-match .voter-username {
     opacity: 1 !important;
 }
 

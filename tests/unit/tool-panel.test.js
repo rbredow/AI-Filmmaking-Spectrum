@@ -131,4 +131,23 @@ describe("tool-panel filtering & search corner cases", () => {
         expect(dot1.classList.contains("search-match")).toBe(false);
         expect(dot2.classList.contains("search-match")).toBe(false);
     });
+
+    it("does not force hidden voter dots to become visible when filtering by branch", () => {
+        setupFilterControls();
+
+        // Create a hidden voter dot (no .visible class)
+        const container = document.getElementById("graph-container");
+        const vDot = document.createElement("div");
+        vDot.className = "voter-dot";
+        vDot.id = "voter-dot-tool_1-userA";
+        container.appendChild(vDot);
+
+        // Filter by branch "Sound"
+        state.selectedTags.add("Sound");
+        applyFilters();
+
+        // Voter dot must remain non-visible
+        expect(vDot.classList.contains("visible")).toBe(false);
+        expect(vDot.classList.contains("search-match")).toBe(false);
+    });
 });

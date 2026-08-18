@@ -109,6 +109,22 @@ describe("timeline-engine", () => {
             expect(parseFloat(dot.dataset.realX)).toBeGreaterThan(50);
             expect(parseFloat(dot.dataset.realY)).toBeGreaterThan(50);
         });
+
+        it("displays and fades voter dots as votes land during timeline forward scrubbing/playback", () => {
+            const container = document.getElementById("graph-container");
+            const AUG15_START = new Date("2026-08-15T18:30:00Z").getTime();
+            const AUG15_END = new Date("2026-08-15T20:30:00Z").getTime();
+
+            // Set last scrub position to AUG15_START
+            applyTimelineTimestamp(AUG15_START, { skipSplashes: true, immediate: true });
+
+            // Now scrub forward to AUG15_END where voterLate (100, 100) lands
+            applyTimelineTimestamp(AUG15_END, { direction: 1, skipSplashes: false });
+
+            const voterDot = document.getElementById("voter-dot-tool_01-voterLate");
+            expect(voterDot).not.toBeNull();
+            expect(voterDot.classList.contains("visible")).toBe(true);
+        });
     });
 
     describe("formatTimelineDate", () => {

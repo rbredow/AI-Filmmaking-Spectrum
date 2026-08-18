@@ -20,7 +20,7 @@ import {
     triggerMegaSplash,
     positionElementForCurrentView,
 } from "./ui/graph-renderer.js";
-import { renderToolPanel, setupFilterControls } from "./ui/tool-panel.js";
+import { applyFilters, renderToolPanel, setupFilterControls } from "./ui/tool-panel.js";
 import { setupDrag, closeAllTooltips } from "./ui/drag-controller.js";
 import {
     isMobileGraphExperience,
@@ -192,11 +192,13 @@ function initApp() {
             buildTimelineData();
             if (isAtLiveTimestamp()) {
                 updateGraphFromData(data || {}, container, hasLoadedInitialVotes);
+                applyFilters();
             }
             hasLoadedInitialVotes = true;
             return;
         }
         updateGraphFromData(data || {}, container, hasLoadedInitialVotes);
+        applyFilters();
         hasLoadedInitialVotes = true;
     }
 
@@ -206,6 +208,7 @@ function initApp() {
             votingEnabled: state.isLocalPreviewMode || s.votingEnabled,
             addingEnabled: state.isStaticMode ? false : !!s.addingEnabled,
         });
+        container.classList.toggle("voting-closed", !state.votingEnabled && !state.isAdmin);
 
         const toggleVoting = document.getElementById("toggle-voting");
         const toggleAdding = document.getElementById("toggle-adding");

@@ -1,9 +1,43 @@
 // AI Tool Directory panel rendering, metric bars, and filter synchronization
-import { state, setState } from "../state/app-state.js";
+import { state } from "../state/app-state.js";
 import { escapeHtml } from "../core/formatters.js";
 import { readinessColor } from "../core/colors.js";
 import { highlightItem, clearHighlight, getHighlightedId } from "./highlight.js";
 import { ACADEMY_BRANCHES } from "../config/constants.js";
+
+function getDisplayedMetric(item, axis) {
+    const dot = document.getElementById(`dot-${item.id}`);
+    const datasetKey = axis === "x" ? "realX" : "realY";
+    const displayedValue = Number.parseFloat(dot?.dataset?.[datasetKey]);
+    if (Number.isFinite(displayedValue)) return displayedValue;
+
+    const fallbackValue = Number.parseFloat(item?.[axis]);
+    return Number.isFinite(fallbackValue) ? fallbackValue : 0;
+}
+
+function compareByName(a, b) {
+    return (a.name || "").localeCompare(b.name || "") || (a.id || "").localeCompare(b.id || "");
+}
+
+function sortTools(items, mode = "alphabetical") {
+    const sortedItems = [...items];
+    const sortConfig = {
+        "readiness-desc": { axis: "y", direction: -1 },
+        "generative-desc": { axis: "x", direction: -1 },
+        "readiness-asc": { axis: "y", direction: 1 },
+        "generative-asc": { axis: "x", direction: 1 },
+    }[mode];
+
+    if (!sortConfig) {
+        return sortedItems.sort(compareByName);
+    }
+
+    return sortedItems.sort((a, b) => {
+        const metricDifference =
+            getDisplayedMetric(a, sortConfig.axis) - getDisplayedMetric(b, sortConfig.axis);
+        return metricDifference === 0 ? compareByName(a, b) : metricDifference * sortConfig.direction;
+    });
+}
 
 export function applyFilters(options = {}) {
     if (options.clearMobileFanFn) options.clearMobileFanFn();
@@ -13,6 +47,7 @@ export function applyFilters(options = {}) {
     const container = document.getElementById("graph-container");
     const branchBtn = document.getElementById("branch-filter-btn");
     const panelInner = document.getElementById("tool-panel-inner");
+    const sortMode = document.getElementById("tool-sort-select")?.value || "alphabetical";
 
     const hasFilter = query !== "" || state.selectedTags.size > 0;
 
@@ -62,10 +97,10 @@ export function applyFilters(options = {}) {
         }
     });
 
-    matchingItems.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-    nonMatchingItems.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    const sortedMatchingItems = sortTools(matchingItems, sortMode);
+    const sortedNonMatchingItems = sortTools(nonMatchingItems, sortMode);
 
-    const orderedItems = [...matchingItems, ...nonMatchingItems];
+    const orderedItems = [...sortedMatchingItems, ...sortedNonMatchingItems];
 
     if (panelInner) {
         orderedItems.forEach((item, index) => {
@@ -90,7 +125,7 @@ export function applyFilters(options = {}) {
         });
     }
 
-    if (options.scrollToTop && hasFilter) {
+    if (options.scrollToTop) {
         const toolPanel = document.getElementById("tool-panel");
         if (toolPanel) {
             toolPanel.scrollTop = 0;
@@ -201,7 +236,15 @@ export function setupFilterControls({ clearMobileFanFn = null } = {}) {
 
     const searchInput = document.getElementById("search-input");
     const searchClear = document.getElementById("search-clear");
+    const sortSelect = document.getElementById("tool-sort-select");
     const options = { scrollToTop: true, clearMobileFanFn };
+
+    if (sortSelect) {
+        sortSelect.addEventListener("change", () => {
+            applyFilters(options);
+        });
+    }
+
     if (searchInput) {
         searchInput.addEventListener("input", () => {
             if (searchClear) {

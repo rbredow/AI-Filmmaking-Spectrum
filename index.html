@@ -171,7 +171,16 @@
                 </div>
             </div>
             <header id="tool-panel-header">
-                <h3 class="ui-type-title">AI Tool Directory</h3>
+                <div id="tool-panel-title-row">
+                    <h3 class="ui-type-title">AI Tool Directory</h3>
+                    <select class="ui-type-control" id="tool-sort-select" aria-label="Sort tools" title="Sort tools">
+                        <option value="alphabetical">A–Z</option>
+                        <option value="readiness-desc">Most ready</option>
+                        <option value="generative-desc">Most generative</option>
+                        <option value="readiness-asc">Least ready</option>
+                        <option value="generative-asc">Least generative</option>
+                    </select>
+                </div>
                 <div id="search-container">
                     <svg id="search-icon" aria-hidden="true" viewBox="0 0 20 20">
                         <circle cx="8.5" cy="8.5" r="5.5"></circle>

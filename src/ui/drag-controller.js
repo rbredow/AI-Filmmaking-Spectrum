@@ -1,14 +1,16 @@
 // Drag-to-vote controller for desktop mouse and mobile touch interactions
 import { state, setState } from "../state/app-state.js";
 import { unplotPct, mobileGraphPlotBounds } from "../core/coords.js";
-import { formatAxisPosition } from "../core/formatters.js";
 import { updateElementPosition, updateConnectionLine } from "./graph-renderer.js";
 import { highlightItem } from "./highlight.js";
 import { showToast } from "./toast.js";
 import { MOBILE_DRAG_THRESHOLD } from "../config/constants.js";
 
 const isTouchDevice = () =>
-    typeof window !== "undefined" && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+
 const isMobileGraphExperience = () =>
     isTouchDevice() &&
     (window.innerWidth <= 600 || (window.innerHeight <= 500 && window.innerWidth <= 1000));

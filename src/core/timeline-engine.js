@@ -15,6 +15,8 @@ export const BASELINE_SNAPSHOT_UIDS = new Set([
     "zOxtZK2qvfbIYyfayL1DSEPQ69I3",
 ]);
 
+let userSessionTimestampsCache = {};
+
 export function getItemCreationTimestamp(itemId, item) {
     if (itemId && itemId.startsWith("user_item_")) {
         const parsed = parseInt(itemId.replace("user_item_", ""), 10);
@@ -67,13 +69,15 @@ export function buildUserSessionTimestamps(items, votes, baselineSnapshot = null
         }
     });
 
+    userSessionTimestampsCache = userTimestamps;
     return userTimestamps;
 }
 
-export function getVoteTimestamp(itemId, uid, vote, userSessionCache = {}) {
+export function getVoteTimestamp(itemId, uid, vote, userSessionCache = null) {
     if (vote && vote.timestamp) return vote.timestamp;
     if (vote && vote.createdAt) return vote.createdAt;
-    if (userSessionCache[uid]) return userSessionCache[uid];
+    const cache = userSessionCache || userSessionTimestampsCache;
+    if (cache && cache[uid]) return cache[uid];
     return new Date("2026-01-17T00:00:00Z").getTime();
 }
 

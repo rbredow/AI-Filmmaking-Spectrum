@@ -1,14 +1,22 @@
 // Graph DOM rendering, dot positioning, voter dots, tooltips, and SVG lines
 import { state } from "../state/app-state.js";
-import { plotPct, unplotPct, baseGraphPoint, projectedMobileGraphPoint } from "../core/coords.js";
+import { plotPct, unplotPct, projectedMobileGraphPoint } from "../core/coords.js";
 import { escapeHtml, formatAxisPosition, formatSpectrumPosition } from "../core/formatters.js";
 import { readinessColor, updateDotColor } from "../core/colors.js";
 import { FADE_TIME } from "../config/constants.js";
 
+const isTouchDevice = () =>
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+
+const isMobileGraphExperience = () =>
+    isTouchDevice() &&
+    (window.innerWidth <= 600 || (window.innerHeight <= 500 && window.innerWidth <= 1000));
+
 export function positionElementForCurrentView(element, x, y, container) {
     if (!container || !element) return;
-    const isMobileExp = window.matchMedia("(hover: none) and (pointer: coarse)").matches &&
-        (window.innerWidth <= 600 || (window.innerHeight <= 500 && window.innerWidth <= 1000));
+    const isMobileExp = isMobileGraphExperience();
 
     if (isMobileExp && container.clientWidth && container.clientHeight) {
         const point = projectedMobileGraphPoint(x, y, container, state.mobileGraphView, {
@@ -47,8 +55,19 @@ export function triggerSplash(container, x, y) {
     if (Date.now() - state.appLaunchTime < 2000) return;
 
     const splash = document.createElement("div");
-    splash.className = "splash-ring";
-    updateElementPosition(splash, x, y, container);
+    splash.className = "splash";
+    if (isMobileGraphExperience() && container.clientWidth && container.clientHeight) {
+        const point = projectedMobileGraphPoint(x, y, container, state.mobileGraphView, {
+            viewMode: state.viewMode,
+            isMobile: true,
+            isTimelineOpen: state.isTimelineOpen,
+        });
+        splash.style.left = `${point.x}px`;
+        splash.style.bottom = `${container.clientHeight - point.y}px`;
+    } else {
+        splash.style.left = plotPct(x) + "%";
+        splash.style.bottom = plotPct(y) + "%";
+    }
     container.appendChild(splash);
     setTimeout(() => splash.remove(), 1200);
 }
@@ -58,32 +77,35 @@ export function triggerMegaSplash(container, x, y) {
     if (Date.now() - state.appLaunchTime < 2000) return;
 
     const splash = document.createElement("div");
-    splash.className = "mega-splash-ring";
-    updateElementPosition(splash, x, y, container);
+    splash.className = "mega-splash";
+    if (isMobileGraphExperience() && container.clientWidth && container.clientHeight) {
+        const point = projectedMobileGraphPoint(x, y, container, state.mobileGraphView, {
+            viewMode: state.viewMode,
+            isMobile: true,
+            isTimelineOpen: state.isTimelineOpen,
+        });
+        splash.style.left = `${point.x}px`;
+        splash.style.bottom = `${container.clientHeight - point.y}px`;
+    } else {
+        splash.style.left = plotPct(x) + "%";
+        splash.style.bottom = plotPct(y) + "%";
+    }
     container.appendChild(splash);
-
-    const glow = document.createElement("div");
-    glow.className = "mega-splash-glow";
-    updateElementPosition(glow, x, y, container);
-    container.appendChild(glow);
-
-    setTimeout(() => {
-        splash.remove();
-        glow.remove();
-    }, 2000);
+    setTimeout(() => splash.remove(), 1200);
 }
 
 export function updateConnectionLine(itemId, x1, y1, x2, y2) {
     const line = document.getElementById(`line-${itemId}`);
     if (!line) return;
 
+    line.dataset.itemId = itemId;
     line.dataset.realX1 = x1;
     line.dataset.realY1 = y1;
     line.dataset.realX2 = x2;
     line.dataset.realY2 = y2;
+    line.style.display = "block";
 
-    const isMobileExp = window.matchMedia("(hover: none) and (pointer: coarse)").matches &&
-        (window.innerWidth <= 600 || (window.innerHeight <= 500 && window.innerWidth <= 1000));
+    const isMobileExp = isMobileGraphExperience();
     const container = document.getElementById("graph-container");
 
     if (isMobileExp && container && container.clientWidth && container.clientHeight) {

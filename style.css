@@ -1152,10 +1152,10 @@ body.onboarding-active #tool-panel-header {
 }
 
 .connection-line {
-    stroke: #3b82f6;
-    stroke-width: 0.5px;
-    stroke-dasharray: 1 1;
-    opacity: 0.6;
+    stroke: #60a5fa;
+    stroke-width: 1px;
+    stroke-dasharray: 2 2;
+    opacity: 0.85;
     vector-effect: non-scaling-stroke;
     transition: opacity 0.5s;
 }

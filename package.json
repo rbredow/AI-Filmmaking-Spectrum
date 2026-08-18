@@ -3,8 +3,11 @@
   "version": "1.0.0",
   "description": "Interactive spectrum for AI filmmaking tools.",
   "main": "app.js",
+  "type": "module",
   "scripts": {
     "dev": "npx http-server -p 8000 -c-1",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "snapshot": "node scripts/snapshot.mjs"
   },
   "keywords": [
@@ -14,5 +17,9 @@
     "firebase"
   ],
   "author": "Rob Bredow",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "jsdom": "^29.1.1",
+    "vitest": "^4.1.10"
+  }
 }
